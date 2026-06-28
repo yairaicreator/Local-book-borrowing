@@ -1,0 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Sans+3:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; }
+
+.fl-scroll::-webkit-scrollbar { display: none; }
+.fl-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes flSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes flFade { from { opacity: 0; } to { opacity: 1; } }
