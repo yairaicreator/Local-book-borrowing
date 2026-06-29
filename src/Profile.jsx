@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, avatarPalette, initial } from './lib/utils'
 import BookCover from './BookCover'
+import AddToReadingList from './AddToReadingList'
 
 export default function Profile({ currentUser, onClose }) {
   const [myBooks, setMyBooks] = useState([])
   const [borrows, setBorrows] = useState([])
   const [readingList, setReadingList] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showAddRL, setShowAddRL] = useState(false)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -34,8 +36,20 @@ export default function Profile({ currentUser, onClose }) {
     setReadingList(prev => prev.filter(r => r.id !== item.id))
   }
 
+  async function handleAdded() {
+    setShowAddRL(false)
+    // re-fetch just the reading list
+    const { data } = await supabase
+      .from('reading_list')
+      .select('*, Books(*, Users(name))')
+      .eq('user_id', currentUser.id)
+      .order('created_at')
+    setReadingList(data || [])
+  }
+
   const pal = avatarPalette(currentUser.id)
   const readCount = readingList.filter(r => r.is_read).length
+  const existingBookIds = readingList.filter(r => r.book_id).map(r => r.book_id)
 
   return (
     <div style={{
@@ -135,11 +149,38 @@ export default function Profile({ currentUser, onClose }) {
             title="Reading List"
             count={readingList.length}
             subtitle={readingList.length > 0 ? `${readCount} of ${readingList.length} read` : null}
+            action={
+              <button onClick={() => setShowAddRL(true)} style={{
+                width: 28, height: 28, borderRadius: 9, border: 'none',
+                background: '#C05A3E', color: '#F7F5F1', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.8" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+            }
           >
             {readingList.length === 0
-              ? <Empty>Tap "Add to Reading List" on any book to save it here.</Empty>
+              ? <Empty>Tap + to add books you want to read.</Empty>
               : readingList.map(item => {
+                  // support both library books and custom entries
                   const book = item.Books
+                  const title = book?.title || item.custom_title
+                  const author = book?.author || item.custom_author
+                  const imageUrl = book?.image_url || item.custom_image_url
+                  const topic = book?.topic || item.custom_topic
+                  const source = book?.Users?.name ? `From ${book.Users.name}'s shelf` : 'Custom book'
+
+                  // build a display object for BookCover
+                  const coverBook = book || {
+                    id: item.id,
+                    title: item.custom_title,
+                    author: item.custom_author,
+                    image_url: item.custom_image_url,
+                  }
+
                   return (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
                       <button onClick={() => toggleRead(item)} style={{
@@ -155,19 +196,19 @@ export default function Profile({ currentUser, onClose }) {
                         )}
                       </button>
 
-                      <BookCover book={book || {}} width={48} height={68} fontSize={9} authorSize={7} />
+                      <BookCover book={coverBook} width={48} height={68} fontSize={9} authorSize={7} />
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontWeight: 600, fontSize: 14, color: item.is_read ? '#A39B90' : '#2C2622',
+                          fontWeight: 600, fontSize: 14,
+                          color: item.is_read ? '#A39B90' : '#2C2622',
                           textDecoration: item.is_read ? 'line-through' : 'none', marginBottom: 1,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
-                          {book?.title}
+                          {title}
                         </div>
-                        <div style={{ fontSize: 12, color: '#7C756C' }}>by {book?.author}</div>
-                        <div style={{ fontSize: 12, color: '#A39B90', marginTop: 2 }}>
-                          From {book?.Users?.name}'s shelf
-                        </div>
+                        {author && <div style={{ fontSize: 12, color: '#7C756C' }}>by {author}</div>}
+                        <div style={{ fontSize: 12, color: '#A39B90', marginTop: 2 }}>{source}</div>
                       </div>
 
                       <button onClick={() => removeFromList(item)} style={{
@@ -186,17 +227,28 @@ export default function Profile({ currentUser, onClose }) {
 
         </>)}
       </div>
+
+      {/* Add to reading list sheet */}
+      {showAddRL && (
+        <AddToReadingList
+          currentUser={currentUser}
+          existingBookIds={existingBookIds}
+          onAdded={handleAdded}
+          onClose={() => setShowAddRL(false)}
+        />
+      )}
     </div>
   )
 }
 
-function Section({ title, count, subtitle, children }) {
+function Section({ title, count, subtitle, action, children }) {
   return (
     <div style={{ marginBottom: 34 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <span style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 18, color: '#2C2622' }}>{title}</span>
         {count > 0 && <span style={{ fontSize: 13, color: '#A39B90', fontWeight: 500 }}>{count}</span>}
-        {subtitle && <span style={{ fontSize: 12, color: '#A39B90', marginLeft: 'auto' }}>{subtitle}</span>}
+        {subtitle && <span style={{ fontSize: 12, color: '#A39B90' }}>{subtitle}</span>}
+        {action && <div style={{ marginLeft: 'auto' }}>{action}</div>}
       </div>
       {children}
     </div>
