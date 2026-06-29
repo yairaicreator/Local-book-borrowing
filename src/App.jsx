@@ -1,17 +1,31 @@
 import { useState, useEffect } from 'react'
 import NameEntry from './NameEntry'
 import Home from './Home'
+import { supabase } from './lib/supabase'
 
 export default function App() {
   const [user, setUser] = useState(undefined) // undefined = loading
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('fl_user')
-      setUser(saved ? JSON.parse(saved) : null)
-    } catch {
-      setUser(null)
+    async function loadUser() {
+      try {
+        const saved = localStorage.getItem('fl_user')
+        if (!saved) { setUser(null); return }
+        const parsed = JSON.parse(saved)
+        // verify the user still exists in the DB
+        const { data } = await supabase
+          .from('Users').select('*').eq('id', parsed.id).maybeSingle()
+        if (data) {
+          setUser(data) // also refresh any changed fields
+        } else {
+          localStorage.removeItem('fl_user')
+          setUser(null)
+        }
+      } catch {
+        setUser(null)
+      }
     }
+    loadUser()
   }, [])
 
   if (user === undefined) return null // initial load
