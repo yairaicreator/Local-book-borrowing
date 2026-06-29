@@ -3,6 +3,17 @@ import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
 import { scanImageText, wordsToLines, detectTopic } from './lib/scanner'
 
+// Returns true only if the extracted text looks like real readable words
+// (filters out garbage like "102N a5 0. DY 55n-92" from non-English covers)
+function looksUsable(words) {
+  if (!words || words.length === 0) return false
+  const tokens = words.map(w => w.text)
+  const realWords = tokens.filter(t => /^[a-zA-Z]{3,}$/.test(t))
+  return realWords.length >= 2 && realWords.length / tokens.length >= 0.35
+}
+
+const isMobileDevice = () => window.innerWidth < 640
+
 export default function AddBook({ currentUser, onClose, onSaved, desktop = false }) {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
@@ -11,22 +22,26 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [status, setStatus] = useState('available')
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [backPreview, setBackPreview] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [backScanning, setBackScanning] = useState(false)
+  const [ocrNote, setOcrNote] = useState('')  // shown when OCR result is unusable
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const frontRef = useRef()
   const backRef = useRef()
+  const mobile = isMobileDevice()
 
   async function handleFrontChange(e) {
     const file = e.target.files[0]
     if (!file) return
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    setOcrNote('')
     setScanning(true)
     try {
       const words = await scanImageText(file)
-      if (words.length > 0) {
+      if (looksUsable(words)) {
         const lines = wordsToLines(words)
         if (lines.length >= 2) {
           if (!title) setTitle(lines.slice(0, lines.length - 1).join(' '))
@@ -36,6 +51,9 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         }
         const guessed = detectTopic(words.map(w => w.text).join(' '))
         if (guessed) setTopic(guessed)
+      } else if (words.length > 0) {
+        // OCR returned something but it looks like garbled non-English text
+        setOcrNote("Couldn't read this cover automatically — please type the title and author.")
       }
     } catch { /* silent */ }
     finally { setScanning(false) }
@@ -44,17 +62,16 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   async function handleBackChange(e) {
     const file = e.target.files[0]
     if (!file) return
+    setBackPreview(URL.createObjectURL(file))
     setBackScanning(true)
     try {
       const words = await scanImageText(file)
-      if (words.length > 0) {
+      if (looksUsable(words)) {
         const lines = wordsToLines(words)
         const text = lines.join(' ')
         if (!description) setDescription(text)
-        if (!detectTopic(topic)) {
-          const guessed = detectTopic(text)
-          if (guessed) setTopic(guessed)
-        }
+        const guessed = detectTopic(text)
+        if (guessed) setTopic(guessed)
       }
     } catch { /* silent */ }
     finally { setBackScanning(false) }
@@ -90,20 +107,9 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const canSave = title.trim() && author.trim() && !saving
 
   if (desktop) {
-    // ── Desktop modal layout ──
     return (
-      <div onClick={onClose} style={{
-        position: 'fixed', inset: 0, background: 'rgba(40,30,18,.46)',
-        zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        animation: 'flFade .2s ease', padding: 40,
-      }}>
-        <div onClick={e => e.stopPropagation()} style={{
-          width: 680, maxWidth: '100%', maxHeight: '90vh',
-          background: '#F7F5F1', borderRadius: 22, overflow: 'hidden',
-          display: 'flex', flexDirection: 'column',
-          boxShadow: '0 30px 70px -20px rgba(40,30,18,.55)',
-          animation: 'flPop .26s cubic-bezier(.22,1,.36,1)',
-        }}>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,18,.46)', zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'flFade .2s ease', padding: 40 }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: 680, maxWidth: '100%', maxHeight: '90vh', background: '#F7F5F1', borderRadius: 22, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 30px 70px -20px rgba(40,30,18,.55)', animation: 'flPop .26s cubic-bezier(.22,1,.36,1)' }}>
           {/* header */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '24px 30px', borderBottom: '1px solid #ECE7DE' }}>
             <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#2C2622' }}>Add a book</div>
@@ -121,13 +127,8 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
 
                 {/* front cover */}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Front cover</div>
-                  <button onClick={() => frontRef.current.click()} style={{
-                    width: 150, border: '1.6px dashed #D8D1C4', background: '#FBFAF7',
-                    borderRadius: 14, padding: imagePreview ? 0 : '18px 12px',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                    cursor: 'pointer', aspectRatio: '128/182', justifyContent: 'center', overflow: 'hidden',
-                  }}>
+                  <div style={photoLabel}>Front cover <span style={photoSub}>— scans title &amp; author</span></div>
+                  <button onClick={() => frontRef.current.click()} style={{ width: 150, border: '1.6px dashed #D8D1C4', background: '#FBFAF7', borderRadius: 14, padding: imagePreview ? 0 : '18px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', aspectRatio: '128/182', justifyContent: 'center', overflow: 'hidden' }}>
                     {imagePreview ? (
                       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
                         <img src={imagePreview} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -135,11 +136,9 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
                       </div>
                     ) : (
                       <>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
-                        </div>
+                        <PhotoIcon />
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#2C2622', textAlign: 'center' }}>Add a cover</div>
-                        <div style={{ fontSize: 11, color: '#A39B90', textAlign: 'center' }}>Scans title & author</div>
+                        <div style={{ fontSize: 11, color: '#A39B90', textAlign: 'center' }}>AI reads title &amp; author</div>
                       </>
                     )}
                   </button>
@@ -147,13 +146,32 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
 
                 {/* back cover */}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Back cover <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
-                  <BackPhotoBtn onClick={() => backRef.current.click()} scanning={backScanning} />
+                  <div style={photoLabel}>Back cover <span style={photoSub}>(optional)</span></div>
+                  <button onClick={() => backRef.current.click()} style={{ width: 150, border: `1.6px dashed ${backPreview ? '#C05A3E' : '#D8D1C4'}`, background: '#FBFAF7', borderRadius: 14, overflow: 'hidden', aspectRatio: '128/182', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', padding: backPreview ? 0 : '18px 12px', flexDirection: 'column', gap: 8 }}>
+                    {backPreview ? (
+                      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                        <img src={backPreview} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        {backScanning && <ScanOverlay label="Reading…" />}
+                        {!backScanning && (
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(44,38,34,.7)', padding: '6px', textAlign: 'center' }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#F7F5F1' }}>✓ Back cover added</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#A39B90', textAlign: 'center' }}>Back cover</div>
+                        <div style={{ fontSize: 11, color: '#C4BAB0', textAlign: 'center' }}>AI reads description</div>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
               {/* fields column */}
               <div style={{ flex: 1, minWidth: 0 }}>
+                {ocrNote && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>{ocrNote}</div>}
                 <DLabel>Title</DLabel>
                 <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Book title" style={dinputStyle} onFocus={f} onBlur={b} />
                 <DLabel>Author</DLabel>
@@ -163,38 +181,22 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
                   <select value={topic} onChange={e => setTopic(e.target.value)} style={{ ...dinputStyle, appearance: 'none', marginBottom: 0 }}>
                     {TOPICS.map(t => <option key={t}>{t}</option>)}
                   </select>
-                  <svg style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
+                  <ChevDown />
                 </div>
               </div>
             </div>
 
             <DLabel style={{ marginTop: 6 }}>Description</DLabel>
-            <textarea value={description} onChange={e => setDescription(e.target.value)}
-              placeholder="A few words about this book…" rows={3}
-              style={{ ...dinputStyle, resize: 'none' }} onFocus={f} onBlur={b} />
+            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="A few words about this book…" rows={3} style={{ ...dinputStyle, resize: 'none' }} onFocus={f} onBlur={b} />
 
             <DLabel>Borrowing status</DLabel>
-            <div style={{ display: 'flex', gap: 10 }}>
-              {Object.entries(STATUS).map(([key, s]) => {
-                const on = status === key
-                return (
-                  <button key={key} onClick={() => setStatus(key)} style={{
-                    flex: 1, border: `1.5px solid ${on ? s.color : '#E7E1D6'}`,
-                    background: on ? s.bg : '#FFFFFF', borderRadius: 12, padding: '13px 6px',
-                    cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  }}>
-                    <span style={{ width: 9, height: 9, borderRadius: '50%', background: s.color }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: on ? s.color : '#7C756C' }}>{s.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <StatusPicker status={status} setStatus={setStatus} />
             {error && <div style={{ color: '#B24A3A', fontSize: 14, marginTop: 10 }}>{error}</div>}
           </div>
 
           <div style={{ padding: '18px 30px 24px', borderTop: '1px solid #ECE7DE', display: 'flex', gap: 12 }}>
-            <button onClick={onClose} style={{ flex: 'none', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: '15px 24px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#6E675C', cursor: 'pointer' }}>Cancel</button>
-            <button onClick={handleSave} disabled={!canSave} style={{ flex: 1, border: 'none', borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1', background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
+            <button onClick={onClose} style={cancelBtnStyle}>Cancel</button>
+            <button onClick={handleSave} disabled={!canSave} style={{ ...saveBtnStyle, background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
               {saving ? 'Saving…' : 'Save book'}
             </button>
           </div>
@@ -214,17 +216,13 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
       </div>
 
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 30px' }}>
-        <input ref={frontRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFrontChange} />
-        <input ref={backRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBackChange} />
+        {/* hidden inputs — capture="environment" on mobile opens camera directly */}
+        <input ref={frontRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleFrontChange} />
+        <input ref={backRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleBackChange} />
 
         {/* front cover */}
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Front cover — scans title &amp; author</div>
-        <button onClick={() => frontRef.current.click()} style={{
-          width: '100%', border: '1.6px dashed #D8D1C4', background: '#FBFAF7',
-          borderRadius: 18, padding: imagePreview ? 0 : 26,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9,
-          cursor: 'pointer', marginBottom: 10, overflow: 'hidden', minHeight: imagePreview ? 180 : 'auto',
-        }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Front cover — AI reads title &amp; author</div>
+        <button onClick={() => frontRef.current.click()} style={{ width: '100%', border: '1.6px dashed #D8D1C4', background: '#FBFAF7', borderRadius: 18, padding: imagePreview ? 0 : 26, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9, cursor: 'pointer', marginBottom: 10, overflow: 'hidden', minHeight: imagePreview ? 180 : 'auto' }}>
           {imagePreview ? (
             <div style={{ position: 'relative', width: '100%' }}>
               <img src={imagePreview} style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
@@ -235,17 +233,37 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
               <div style={{ width: 50, height: 50, borderRadius: 14, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#2C2622' }}>Front cover photo</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#2C2622' }}>{mobile ? 'Take a photo of front cover' : 'Front cover photo'}</div>
               <div style={{ fontSize: 13, color: '#A39B90' }}>AI will extract title &amp; author</div>
             </>
           )}
         </button>
 
+        {ocrNote && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 12, padding: '11px 14px', marginBottom: 14 }}>{ocrNote}</div>}
+
         {/* back cover */}
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Back cover <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional — scans description)</span></div>
-        <div style={{ marginBottom: 22 }}>
-          <BackPhotoBtn onClick={() => backRef.current.click()} scanning={backScanning} fullWidth />
-        </div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Back cover <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional — AI reads description)</span></div>
+        <button onClick={() => backRef.current.click()} style={{ width: '100%', border: `1.6px dashed ${backPreview ? '#C05A3E' : '#D8D1C4'}`, background: '#FBFAF7', borderRadius: 18, overflow: 'hidden', marginBottom: 22, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', minHeight: backPreview ? 140 : 'auto', padding: backPreview ? 0 : '18px 20px', gap: 9 }}>
+          {backPreview ? (
+            <div style={{ position: 'relative', width: '100%' }}>
+              <img src={backPreview} style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
+              {backScanning && <ScanOverlay label="Reading back cover…" />}
+              {!backScanning && (
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(44,38,34,.72)', padding: '8px', textAlign: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#F7F5F1' }}>✓ Back cover added · tap to change</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#7C756C' }}>{mobile ? 'Take a photo of back cover' : 'Back cover photo'}</div>
+              <div style={{ fontSize: 12, color: '#A39B90' }}>AI will read the description</div>
+            </>
+          )}
+        </button>
 
         <Label>Title</Label>
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Book title" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
@@ -258,20 +276,10 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           <select value={topic} onChange={e => setTopic(e.target.value)} style={{ ...inputStyle, appearance: 'none', marginBottom: 0 }}>
             {TOPICS.map(t => <option key={t}>{t}</option>)}
           </select>
-          <svg style={{ position: 'absolute', right: 15, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
+          <ChevDown />
         </div>
         <Label>Borrowing status</Label>
-        <div style={{ display: 'flex', gap: 9, marginBottom: 8 }}>
-          {Object.entries(STATUS).map(([key, s]) => {
-            const on = status === key
-            return (
-              <button key={key} onClick={() => setStatus(key)} style={{ flex: 1, border: `1.5px solid ${on ? s.color : '#E7E1D6'}`, background: on ? s.bg : '#FFFFFF', borderRadius: 13, padding: '13px 6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: s.color }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: on ? s.color : '#7C756C' }}>{s.label}</span>
-              </button>
-            )
-          })}
-        </div>
+        <StatusPicker status={status} setStatus={setStatus} />
         {error && <div style={{ color: '#B24A3A', fontSize: 14, marginTop: 8 }}>{error}</div>}
       </div>
 
@@ -293,28 +301,32 @@ function ScanOverlay({ label }) {
   )
 }
 
-function BackPhotoBtn({ onClick, scanning, fullWidth }) {
+function StatusPicker({ status, setStatus }) {
   return (
-    <button onClick={onClick} style={{
-      width: fullWidth ? '100%' : 150, border: '1.6px dashed #D8D1C4', background: '#FBFAF7',
-      borderRadius: fullWidth ? 14 : 12, padding: '14px 12px',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-      cursor: 'pointer', position: 'relative', overflow: 'hidden',
-    }}>
-      {scanning ? (
-        <>
-          <div style={{ width: 18, height: 18, border: '2.5px solid #DDD6CA', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite' }} />
-          <span style={{ fontSize: 13, color: '#A39B90' }}>Scanning back…</span>
-        </>
-      ) : (
-        <>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
-          <span style={{ fontSize: 13, color: '#7C756C', fontWeight: 600 }}>Back cover photo</span>
-          <span style={{ fontSize: 12, color: '#A39B90' }}>→ description</span>
-        </>
-      )}
-    </button>
+    <div style={{ display: 'flex', gap: 9, marginBottom: 8 }}>
+      {Object.entries(STATUS).map(([key, s]) => {
+        const on = status === key
+        return (
+          <button key={key} onClick={() => setStatus(key)} style={{ flex: 1, border: `1.5px solid ${on ? s.color : '#E7E1D6'}`, background: on ? s.bg : '#FFFFFF', borderRadius: 13, padding: '13px 6px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: s.color }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: on ? s.color : '#7C756C' }}>{s.label}</span>
+          </button>
+        )
+      })}
+    </div>
   )
+}
+
+function PhotoIcon() {
+  return (
+    <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+    </div>
+  )
+}
+
+function ChevDown() {
+  return <svg style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg>
 }
 
 function Label({ children }) { return <div style={{ fontSize: 13, fontWeight: 600, color: '#7C756C', marginBottom: 7 }}>{children}</div> }
@@ -322,6 +334,10 @@ function DLabel({ children, style }) { return <div style={{ fontSize: 13, fontWe
 
 const inputStyle = { width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 13, padding: '14px 15px', fontFamily: "'Source Sans 3',sans-serif", fontSize: 16, color: '#2C2622', outline: 'none', marginBottom: 18, display: 'block' }
 const dinputStyle = { width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 12, padding: '13px 15px', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', outline: 'none', marginBottom: 16, display: 'block' }
+const cancelBtnStyle = { flex: 'none', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: '15px 24px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#6E675C', cursor: 'pointer' }
+const saveBtnStyle = { flex: 1, border: 'none', borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1' }
+const photoLabel = { fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }
+const photoSub = { fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#B4ABA0' }
 
 function focusBorder(e) { e.target.style.borderColor = '#C05A3E' }
 function blurBorder(e) { e.target.style.borderColor = '#E7E1D6' }
