@@ -26,8 +26,15 @@ export async function scanImageText(file) {
       })
     }
   )
-  if (!res.ok) return ''
+  if (!res.ok) {
+    const errBody = await res.text()
+    throw new Error(`Vision API ${res.status}: ${errBody}`)
+  }
   const data = await res.json()
+  // Check for API-level error in the response body
+  if (data.responses?.[0]?.error) {
+    throw new Error(data.responses[0].error.message)
+  }
   return data.responses?.[0]?.fullTextAnnotation?.text?.trim() || ''
 }
 

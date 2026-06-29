@@ -42,9 +42,12 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         }
         const guessed = detectTopic(text)
         if (guessed) setTopic(guessed)
+      } else {
+        setOcrNote("No text found on this cover — please type manually.")
       }
-    } catch { /* silent */ }
-    finally { setScanning(false) }
+    } catch (err) {
+      setOcrNote(`Scan failed: ${err.message}`)
+    } finally { setScanning(false) }
   }
 
   async function handleBackChange(e) {
@@ -59,8 +62,9 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         const guessed = detectTopic(text)
         if (guessed) setTopic(guessed)
       }
-    } catch { /* silent */ }
-    finally { setBackScanning(false) }
+    } catch (err) {
+      setOcrNote(`Back cover scan failed: ${err.message}`)
+    } finally { setBackScanning(false) }
   }
 
   async function handleSave() {
