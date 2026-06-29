@@ -4,6 +4,7 @@ import { STATUS, avatarPalette, initial } from './lib/utils'
 import BookCover from './BookCover'
 import BookDetail from './BookDetail'
 import AddBook from './AddBook'
+import Profile from './Profile'
 import Toast from './Toast'
 
 export default function Home({ currentUser }) {
@@ -13,6 +14,7 @@ export default function Home({ currentUser }) {
   const [filter, setFilter] = useState('user')
   const [activeBook, setActiveBook] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [toast, setToast] = useState('')
   const toastRef = { current: null }
 
@@ -110,13 +112,14 @@ export default function Home({ currentUser }) {
           <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#33291C', letterSpacing: '-.01em' }}>
             Family Library
           </div>
-          <div style={{
+          <button onClick={() => setShowProfile(true)} style={{
             marginLeft: 'auto', width: 36, height: 36, borderRadius: '50%',
             background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 600, fontSize: 15, color: '#7A4A28', flex: 'none',
+            border: 'none', cursor: 'pointer',
           }}>
             {initial(currentUser.name)}
-          </div>
+          </button>
         </div>
 
         {/* search */}
@@ -232,6 +235,10 @@ export default function Home({ currentUser }) {
             fetchBooks()
           }}
         />
+      )}
+
+      {showProfile && (
+        <Profile currentUser={currentUser} onClose={() => setShowProfile(false)} />
       )}
 
       <Toast message={toast} />
