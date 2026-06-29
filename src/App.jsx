@@ -1,10 +1,23 @@
 import { useState, useEffect } from 'react'
 import NameEntry from './NameEntry'
 import Home from './Home'
+import HomeDesktop from './HomeDesktop'
 import { supabase } from './lib/supabase'
+
+function useDesktop() {
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 640)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)')
+    const handler = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isDesktop
+}
 
 export default function App() {
   const [user, setUser] = useState(undefined) // undefined = loading
+  const isDesktop = useDesktop()
 
   useEffect(() => {
     async function loadUser() {
@@ -40,19 +53,24 @@ export default function App() {
 
   if (user === undefined) return null // initial load
 
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh', background: '#F5F0E6', overflow: 'hidden' }}>
+          <NameEntry onDone={setUser} />
+        </div>
+      </div>
+    )
+  }
+
+  if (isDesktop) {
+    return <HomeDesktop currentUser={user} />
+  }
+
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center',
-      background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif",
-    }}>
-      <div style={{
-        position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh',
-        background: '#F5F0E6', overflow: 'hidden',
-      }}>
-        {user
-          ? <Home currentUser={user} />
-          : <NameEntry onDone={setUser} />
-        }
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
+      <div style={{ position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh', background: '#F5F0E6', overflow: 'hidden' }}>
+        <Home currentUser={user} />
       </div>
     </div>
   )
