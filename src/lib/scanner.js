@@ -1,30 +1,39 @@
-const API_KEY = 'XuOE7YjWxnwu45Onz77nqO67MmDDcBqJ6IyVnH3p'
+const VISION_KEY = 'AIzaSyDC9s4Ge7V5XhygYjvEErv7Y-4BnnF0SZc'
 
-export async function scanImageText(file) {
-  const formData = new FormData()
-  formData.append('image', file)
-  const res = await fetch('https://api.api-ninjas.com/v1/imagetotext', {
-    method: 'POST',
-    headers: { 'X-Api-Key': API_KEY },
-    body: formData,
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result.split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
   })
-  if (!res.ok) return []
-  const words = await res.json()
-  return Array.isArray(words) ? words : []
 }
 
-export function wordsToLines(words) {
-  const sorted = [...words].sort((a, b) => a.bounding_box.y1 - b.bounding_box.y1)
-  const lines = []
-  sorted.forEach(w => {
-    const last = lines[lines.length - 1]
-    if (last && Math.abs(w.bounding_box.y1 - last.y) < 15) {
-      last.words.push(w.text)
-    } else {
-      lines.push({ y: w.bounding_box.y1, words: [w.text] })
+// Returns the full detected text as a plain string, or '' on failure.
+// Google Vision supports Hebrew, Arabic, Latin, and many other scripts.
+export async function scanImageText(file) {
+  const base64 = await fileToBase64(file)
+  const res = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${VISION_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: base64 },
+          features: [{ type: 'TEXT_DETECTION' }],
+        }]
+      })
     }
-  })
-  return lines.map(l => l.words.join(' '))
+  )
+  if (!res.ok) return ''
+  const data = await res.json()
+  return data.responses?.[0]?.fullTextAnnotation?.text?.trim() || ''
+}
+
+// Split Vision's output into non-empty lines
+export function textToLines(text) {
+  return text.split('\n').map(l => l.trim()).filter(Boolean)
 }
 
 const TOPIC_KEYWORDS = {

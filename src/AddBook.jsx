@@ -1,16 +1,7 @@
 import { useState, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, wordsToLines, detectTopic } from './lib/scanner'
-
-// Returns true only if the extracted text looks like real readable words
-// (filters out garbage like "102N a5 0. DY 55n-92" from non-English covers)
-function looksUsable(words) {
-  if (!words || words.length === 0) return false
-  const tokens = words.map(w => w.text)
-  const realWords = tokens.filter(t => /^[a-zA-Z]{3,}$/.test(t))
-  return realWords.length >= 2 && realWords.length / tokens.length >= 0.35
-}
+import { scanImageText, textToLines, detectTopic } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -40,20 +31,17 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setOcrNote('')
     setScanning(true)
     try {
-      const words = await scanImageText(file)
-      if (looksUsable(words)) {
-        const lines = wordsToLines(words)
+      const text = await scanImageText(file)
+      if (text) {
+        const lines = textToLines(text)
         if (lines.length >= 2) {
           if (!title) setTitle(lines.slice(0, lines.length - 1).join(' '))
           if (!author) setAuthor(lines[lines.length - 1])
         } else if (lines.length === 1) {
           if (!title) setTitle(lines[0])
         }
-        const guessed = detectTopic(words.map(w => w.text).join(' '))
+        const guessed = detectTopic(text)
         if (guessed) setTopic(guessed)
-      } else if (words.length > 0) {
-        // OCR returned something but it looks like garbled non-English text
-        setOcrNote("Couldn't read this cover automatically — please type the title and author.")
       }
     } catch { /* silent */ }
     finally { setScanning(false) }
@@ -65,11 +53,9 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setBackPreview(URL.createObjectURL(file))
     setBackScanning(true)
     try {
-      const words = await scanImageText(file)
-      if (looksUsable(words)) {
-        const lines = wordsToLines(words)
-        const text = lines.join(' ')
-        if (!description) setDescription(text)
+      const text = await scanImageText(file)
+      if (text) {
+        if (!description) setDescription(text.replace(/\n/g, ' ').trim())
         const guessed = detectTopic(text)
         if (guessed) setTopic(guessed)
       }
