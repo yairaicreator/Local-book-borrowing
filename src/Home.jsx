@@ -194,7 +194,7 @@ export default function Home({ currentUser }) {
         ))}
         {noResults && (
           <div style={{ textAlign: 'center', padding: '60px 30px', color: '#A8997E', fontSize: 15 }}>
-            {q ? `No books match "${search}".` : 'No books yet. Add the first one!'}
+            {q ? `No books match “${search}”.` : 'No books yet. Tap + to add the first one!'}
           </div>
         )}
       </div>

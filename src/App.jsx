@@ -18,14 +18,12 @@ export default function App() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#e7e1d4', padding: '24px 0',
-      fontFamily: "'Source Sans 3', sans-serif",
+      minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center',
+      background: '#e7e1d4', fontFamily: "'Source Sans 3', sans-serif",
     }}>
       <div style={{
-        position: 'relative', width: 390, height: 844,
-        background: '#F5F0E6', borderRadius: 44, overflow: 'hidden',
-        boxShadow: '0 30px 70px -20px rgba(60,48,30,.45), 0 0 0 11px #1f1b15, 0 0 0 13px #34302a',
+        position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh',
+        background: '#F5F0E6', overflow: 'hidden',
       }}>
         {user
           ? <Home currentUser={user} />
