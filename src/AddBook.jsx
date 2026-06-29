@@ -11,14 +11,57 @@ export default function AddBook({ currentUser, onClose, onSaved }) {
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef()
 
-  function handleFileChange(e) {
+  async function handleFileChange(e) {
     const file = e.target.files[0]
     if (!file) return
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    // Auto-extract text from cover image
+    setScanning(true)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await fetch('https://api.api-ninjas.com/v1/imagetotext', {
+        method: 'POST',
+        headers: { 'X-Api-Key': 'XuOE7YjWxnwu45Onz77nqO67MmDDcBqJ6IyVnH3p' },
+        body: formData,
+      })
+      if (res.ok) {
+        const words = await res.json() // [{ text, bounding_box: {x1,y1,x2,y2} }]
+        if (Array.isArray(words) && words.length > 0) {
+          // Group words into lines by vertical position
+          const sorted = [...words].sort((a, b) => a.bounding_box.y1 - b.bounding_box.y1)
+          const lines = []
+          sorted.forEach(w => {
+            const last = lines[lines.length - 1]
+            if (last && Math.abs(w.bounding_box.y1 - last.y) < 15) {
+              last.words.push(w.text)
+            } else {
+              lines.push({ y: w.bounding_box.y1, words: [w.text] })
+            }
+          })
+          const textLines = lines.map(l => l.words.join(' '))
+          // Heuristic: first line(s) = title, last distinct line = author
+          if (textLines.length >= 2) {
+            // Last line often has author, first has title
+            const possibleAuthor = textLines[textLines.length - 1]
+            const possibleTitle = textLines.slice(0, textLines.length - 1).join(' ')
+            if (!title) setTitle(possibleTitle)
+            if (!author) setAuthor(possibleAuthor)
+          } else if (textLines.length === 1) {
+            if (!title) setTitle(textLines[0])
+          }
+        }
+      }
+    } catch {
+      // silently fail — user can fill in manually
+    } finally {
+      setScanning(false)
+    }
   }
 
   async function handleSave() {
@@ -91,8 +134,19 @@ export default function AddBook({ currentUser, onClose, onSaved }) {
           minHeight: imagePreview ? 180 : 'auto',
         }}>
           {imagePreview ? (
-            <img src={imagePreview} alt="cover preview"
-              style={{ width: '100%', height: 180, objectFit: 'cover' }} />
+            <div style={{ position: 'relative', width: '100%' }}>
+              <img src={imagePreview} alt="cover preview"
+                style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
+              {scanning && (
+                <div style={{
+                  position: 'absolute', inset: 0, background: 'rgba(44,38,34,.55)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}>
+                  <div style={{ width: 28, height: 28, border: '3px solid rgba(247,245,241,.35)', borderTopColor: '#F7F5F1', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite' }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#F7F5F1' }}>Reading cover…</div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <div style={{ width: 50, height: 50, borderRadius: 14, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

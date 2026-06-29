@@ -16,10 +16,20 @@ export default function App() {
         const { data } = await supabase
           .from('Users').select('*').eq('id', parsed.id).maybeSingle()
         if (data) {
-          setUser(data) // also refresh any changed fields
+          setUser(data) // refresh any changed fields
         } else {
-          localStorage.removeItem('fl_user')
-          setUser(null)
+          // User was deleted from DB — re-insert them so they don't need to re-enter their name
+          const { data: newData } = await supabase
+            .from('Users')
+            .insert({ name: parsed.name, phone: parsed.phone || null, email: parsed.email || null })
+            .select().single()
+          if (newData) {
+            localStorage.setItem('fl_user', JSON.stringify(newData))
+            setUser(newData)
+          } else {
+            localStorage.removeItem('fl_user')
+            setUser(null)
+          }
         }
       } catch {
         setUser(null)

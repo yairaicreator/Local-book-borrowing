@@ -8,3 +8,4 @@ body { margin: 0; }
 
 @keyframes flSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes flFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fl-spin { to { transform: rotate(360deg); } }
