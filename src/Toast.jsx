@@ -4,7 +4,7 @@ export default function Toast({ message }) {
     <div style={{
       position: 'absolute', left: '50%', bottom: 30,
       transform: 'translateX(-50%)',
-      background: '#33291C', color: '#F5F0E6',
+      background: '#2C2622', color: '#F7F5F1',
       fontSize: 14, fontWeight: 600,
       padding: '12px 20px', borderRadius: 13,
       zIndex: 50, whiteSpace: 'nowrap',

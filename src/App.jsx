@@ -19,7 +19,7 @@ export default function App() {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center',
-      background: '#e7e1d4', fontFamily: "'Source Sans 3', sans-serif",
+      background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif",
     }}>
       <div style={{
         position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh',

@@ -39,22 +39,22 @@ export default function Profile({ currentUser, onClose }) {
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, background: '#F5F0E6',
+      position: 'absolute', inset: 0, background: '#F7F5F1',
       zIndex: 30, display: 'flex', flexDirection: 'column',
       animation: 'flFade .22s ease',
     }}>
       {/* header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '58px 18px 14px', borderBottom: '1px solid #E8DFCC' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '58px 18px 14px', borderBottom: '1px solid #ECE7DE' }}>
         <button onClick={onClose} style={{
           width: 34, height: 34, borderRadius: '50%', border: 'none',
-          background: '#EAE2D0', cursor: 'pointer',
+          background: '#F0ECE4', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none',
         }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#7A6F58" strokeWidth="2.4" strokeLinecap="round">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round">
             <path d="M15 5l-7 7 7 7" />
           </svg>
         </button>
-        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#33291C' }}>My Profile</div>
+        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622' }}>My Profile</div>
       </div>
 
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px 48px' }}>
@@ -69,18 +69,18 @@ export default function Profile({ currentUser, onClose }) {
             {initial(currentUser.name)}
           </div>
           <div>
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#33291C' }}>{currentUser.name}</div>
-            {currentUser.phone && <div style={{ fontSize: 13, color: '#A8997E', marginTop: 2 }}>{currentUser.phone}</div>}
-            {currentUser.email && <div style={{ fontSize: 13, color: '#A8997E' }}>{currentUser.email}</div>}
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#2C2622' }}>{currentUser.name}</div>
+            {currentUser.phone && <div style={{ fontSize: 13, color: '#A39B90', marginTop: 2 }}>{currentUser.phone}</div>}
+            {currentUser.email && <div style={{ fontSize: 13, color: '#A39B90' }}>{currentUser.email}</div>}
           </div>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', color: '#A8997E', fontSize: 15, padding: 40 }}>Loading…</div>
+          <div style={{ textAlign: 'center', color: '#A39B90', fontSize: 15, padding: 40 }}>Loading…</div>
         ) : (<>
 
           {/* ── My Shelf ── */}
-          <Section title="My Shelf" count={myBooks.length} emoji="📚">
+          <Section title="My Shelf" count={myBooks.length}>
             {myBooks.length === 0
               ? <Empty>You haven't added any books yet.</Empty>
               : (
@@ -94,7 +94,7 @@ export default function Profile({ currentUser, onClose }) {
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flex: 'none' }} />
                           <span style={{ fontSize: 11, fontWeight: 600, color: s.color }}>{s.label}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#8A7F6B', marginTop: 1, lineHeight: 1.3 }}>{book.title}</div>
+                        <div style={{ fontSize: 12, color: '#7C756C', marginTop: 1, lineHeight: 1.3 }}>{book.title}</div>
                       </div>
                     )
                   })}
@@ -104,19 +104,19 @@ export default function Profile({ currentUser, onClose }) {
           </Section>
 
           {/* ── Books I'm Borrowing ── */}
-          <Section title="Books I'm Borrowing" count={borrows.length} emoji="🤝">
+          <Section title="Books I'm Borrowing" count={borrows.length}>
             {borrows.length === 0
               ? <Empty>No active borrows — request a book to see it here.</Empty>
               : borrows.map(b => {
                   const book = b.Books
                   const s = STATUS[book?.status] || STATUS.available
                   return (
-                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #EDE5D4' }}>
+                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
                       <BookCover book={book || {}} width={48} height={68} fontSize={9} authorSize={7} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: '#33291C', marginBottom: 1 }}>{book?.title}</div>
-                        <div style={{ fontSize: 12, color: '#8A7F6B' }}>by {book?.author}</div>
-                        <div style={{ fontSize: 12, color: '#A8997E', marginTop: 4 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622', marginBottom: 1 }}>{book?.title}</div>
+                        <div style={{ fontSize: 12, color: '#7C756C' }}>by {book?.author}</div>
+                        <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>
                           From <strong style={{ color: '#6B5440' }}>{book?.Users?.name}</strong>'s shelf
                         </div>
                       </div>
@@ -134,7 +134,6 @@ export default function Profile({ currentUser, onClose }) {
           <Section
             title="Reading List"
             count={readingList.length}
-            emoji="📖"
             subtitle={readingList.length > 0 ? `${readCount} of ${readingList.length} read` : null}
           >
             {readingList.length === 0
@@ -142,11 +141,10 @@ export default function Profile({ currentUser, onClose }) {
               : readingList.map(item => {
                   const book = item.Books
                   return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #EDE5D4' }}>
-                      {/* checkbox */}
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
                       <button onClick={() => toggleRead(item)} style={{
                         width: 26, height: 26, borderRadius: 8, flex: 'none',
-                        border: `2px solid ${item.is_read ? '#2E8B57' : '#D8CDB6'}`,
+                        border: `2px solid ${item.is_read ? '#2E8B57' : '#DDD6CA'}`,
                         background: item.is_read ? '#2E8B57' : 'transparent',
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
@@ -161,18 +159,17 @@ export default function Profile({ currentUser, onClose }) {
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
-                          fontWeight: 600, fontSize: 14, color: item.is_read ? '#A8997E' : '#33291C',
+                          fontWeight: 600, fontSize: 14, color: item.is_read ? '#A39B90' : '#2C2622',
                           textDecoration: item.is_read ? 'line-through' : 'none', marginBottom: 1,
                         }}>
                           {book?.title}
                         </div>
-                        <div style={{ fontSize: 12, color: '#8A7F6B' }}>by {book?.author}</div>
-                        <div style={{ fontSize: 12, color: '#A8997E', marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: '#7C756C' }}>by {book?.author}</div>
+                        <div style={{ fontSize: 12, color: '#A39B90', marginTop: 2 }}>
                           From {book?.Users?.name}'s shelf
                         </div>
                       </div>
 
-                      {/* remove */}
                       <button onClick={() => removeFromList(item)} style={{
                         border: 'none', background: 'none', cursor: 'pointer', padding: 6,
                         color: '#C4BAA8', flex: 'none',
@@ -193,14 +190,13 @@ export default function Profile({ currentUser, onClose }) {
   )
 }
 
-function Section({ title, count, emoji, subtitle, children }) {
+function Section({ title, count, subtitle, children }) {
   return (
     <div style={{ marginBottom: 34 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 18 }}>{emoji}</span>
-        <span style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 18, color: '#33291C' }}>{title}</span>
-        {count > 0 && <span style={{ fontSize: 13, color: '#A8997E', fontWeight: 500 }}>{count}</span>}
-        {subtitle && <span style={{ fontSize: 12, color: '#A8997E', marginLeft: 'auto' }}>{subtitle}</span>}
+        <span style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 18, color: '#2C2622' }}>{title}</span>
+        {count > 0 && <span style={{ fontSize: 13, color: '#A39B90', fontWeight: 500 }}>{count}</span>}
+        {subtitle && <span style={{ fontSize: 12, color: '#A39B90', marginLeft: 'auto' }}>{subtitle}</span>}
       </div>
       {children}
     </div>
@@ -208,5 +204,5 @@ function Section({ title, count, emoji, subtitle, children }) {
 }
 
 function Empty({ children }) {
-  return <div style={{ fontSize: 14, color: '#A8997E', fontStyle: 'italic', padding: '4px 0 8px' }}>{children}</div>
+  return <div style={{ fontSize: 14, color: '#A39B90', fontStyle: 'italic', padding: '4px 0 8px' }}>{children}</div>
 }

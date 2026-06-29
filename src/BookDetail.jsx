@@ -33,14 +33,14 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
 
   let borrowBg, borrowInk, borrowLabel, borrowCursor, borrowAction
   if (isOwnBook) {
-    borrowBg = '#EAE2D0'; borrowInk = '#A8997E'; borrowCursor = 'not-allowed'
+    borrowBg = '#F0ECE4'; borrowInk = '#A39B90'; borrowCursor = 'not-allowed'
     borrowLabel = 'This is your book'; borrowAction = null
   } else if (!isAvail) {
-    borrowBg = '#E0D7C4'; borrowInk = '#A8997E'; borrowCursor = 'not-allowed'
+    borrowBg = '#E9E3D8'; borrowInk = '#A39B90'; borrowCursor = 'not-allowed'
     borrowLabel = book.status === 'borrowed' ? 'Currently Borrowed' : 'Not Available'
     borrowAction = null
   } else {
-    borrowBg = '#B45A3C'; borrowInk = '#F5F0E6'; borrowCursor = 'pointer'
+    borrowBg = '#C05A3E'; borrowInk = '#F7F5F1'; borrowCursor = 'pointer'
     borrowLabel = 'Request to Borrow'
     borrowAction = () => setShowContact(true)
   }
@@ -58,17 +58,10 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
     onBorrow(book)
   }
 
-  function openWhatsApp() {
-    window.open(`https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`, '_blank')
-    recordBorrow()
-  }
-  function openSMS() {
-    window.open(`sms:${ownerPhone}?body=${encodeURIComponent(msgText)}`, '_blank')
-    recordBorrow()
-  }
+  function openWhatsApp() { window.open(`https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow() }
+  function openSMS() { window.open(`sms:${ownerPhone}?body=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow() }
   function openEmail() {
-    const subject = encodeURIComponent(`Book borrow request: ${book.title}`)
-    window.open(`mailto:${ownerEmail}?subject=${subject}&body=${encodeURIComponent(msgText)}`, '_blank')
+    window.open(`mailto:${ownerEmail}?subject=${encodeURIComponent(`Book borrow request: ${book.title}`)}&body=${encodeURIComponent(msgText)}`, '_blank')
     recordBorrow()
   }
 
@@ -96,26 +89,24 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
 
       <div style={{
         position: 'absolute', left: 0, right: 0, bottom: 0, top: 46,
-        background: '#F5F0E6', borderRadius: '26px 26px 0 0',
+        background: '#F7F5F1', borderRadius: '26px 26px 0 0',
         animation: 'flSheetUp .32s cubic-bezier(.22,1,.36,1)',
         zIndex: 21, display: 'flex', flexDirection: 'column', overflow: 'hidden',
         boxShadow: '0 -16px 40px -16px rgba(40,30,18,.4)',
       }}>
-        {/* handle row */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '14px 18px 6px', position: 'relative' }}>
-          <div style={{ width: 38, height: 5, borderRadius: 3, background: '#D8CDB6', margin: '0 auto' }} />
+          <div style={{ width: 38, height: 5, borderRadius: 3, background: '#DDD6CA', margin: '0 auto' }} />
           <button onClick={onClose} style={{
             position: 'absolute', right: 16, top: 14, width: 32, height: 32,
-            borderRadius: '50%', border: 'none', background: '#EAE2D0', cursor: 'pointer',
+            borderRadius: '50%', border: 'none', background: '#F0ECE4', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A6F58" strokeWidth="2.4" strokeLinecap="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round">
               <path d="M6 6l12 12M18 6 6 18" />
             </svg>
           </button>
         </div>
 
-        {/* scroll content */}
         <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px 24px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
             <BookCover book={book} width={176} height={250} fontSize={23} authorSize={11} />
@@ -129,24 +120,24 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />{s.label}
             </span>
             {book.topic && (
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#8A6A3A', background: '#F1E7D2', padding: '5px 11px', borderRadius: 999 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#8A6A3A', background: '#F3ECDD', padding: '5px 11px', borderRadius: 999 }}>
                 {book.topic}
               </span>
             )}
           </div>
 
-          <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 27, lineHeight: 1.15, color: '#33291C', margin: '0 0 5px' }}>
+          <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 27, lineHeight: 1.15, color: '#2C2622', margin: '0 0 5px' }}>
             {book.title}
           </h2>
-          <div style={{ fontSize: 16, color: '#8A7F6B', marginBottom: 18 }}>by {book.author}</div>
+          <div style={{ fontSize: 16, color: '#7C756C', marginBottom: 18 }}>by {book.author}</div>
 
           {book.description && (
-            <p style={{ fontSize: 16, lineHeight: 1.6, color: '#54493A', margin: '0 0 18px' }}>{book.description}</p>
+            <p style={{ fontSize: 16, lineHeight: 1.6, color: '#4A443D', margin: '0 0 18px' }}>{book.description}</p>
           )}
 
           <div style={{
             display: 'flex', alignItems: 'center', gap: 11,
-            background: '#FFFCF5', border: '1.5px solid #E8DFCC', borderRadius: 14, padding: '13px 15px',
+            background: '#FFFFFF', border: '1.5px solid #ECE7DE', borderRadius: 14, padding: '13px 15px',
             marginBottom: 18,
           }}>
             <div style={{
@@ -156,38 +147,33 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
               {initial(book.Users?.name)}
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#A8997E' }}>{holderLabel}</div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#33291C' }}>{holderName}</div>
+              <div style={{ fontSize: 12, color: '#A39B90' }}>{holderLabel}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#2C2622' }}>{holderName}</div>
             </div>
           </div>
 
-          {/* Reading list toggle — only for other people's books */}
           {!isOwnBook && (
             <button onClick={toggleReadingList} disabled={rlLoading} style={{
-              width: '100%', border: `1.5px solid ${inReadingList ? '#B45A3C' : '#E2D9C6'}`,
-              background: inReadingList ? '#FBF0EB' : '#FFFCF5',
+              width: '100%', border: `1.5px solid ${inReadingList ? '#C05A3E' : '#E7E1D6'}`,
+              background: inReadingList ? '#FBF0EB' : '#FFFFFF',
               borderRadius: 13, padding: '12px 16px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif",
               fontWeight: 600, fontSize: 14,
-              color: inReadingList ? '#B45A3C' : '#7A6F58',
+              color: inReadingList ? '#C05A3E' : '#6E675C',
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke={inReadingList ? '#B45A3C' : '#A8997E'} strokeWidth="2.2" strokeLinecap="round">
-                {inReadingList
-                  ? <path d="M5 13l4 4L19 7" />
-                  : <path d="M12 5v14M5 12h14" />
-                }
+                stroke={inReadingList ? '#C05A3E' : '#A39B90'} strokeWidth="2.2" strokeLinecap="round">
+                {inReadingList ? <path d="M5 13l4 4L19 7" /> : <path d="M12 5v14M5 12h14" />}
               </svg>
               {inReadingList ? 'Saved to Reading List' : 'Add to Reading List'}
             </button>
           )}
         </div>
 
-        {/* footer */}
-        <div style={{ padding: '14px 24px 30px', background: '#F5F0E6', borderTop: '1px solid #E8DFCC' }}>
+        <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
           {isOwnBook && (
-            <div style={{ fontSize: 13, color: '#A8997E', textAlign: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center', marginBottom: 10 }}>
               You added this book — others can borrow it from you.
             </div>
           )}
@@ -201,7 +187,6 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
         </div>
       </div>
 
-      {/* Contact sheet */}
       {showContact && (
         <>
           <div onClick={() => setShowContact(false)} style={{
@@ -210,16 +195,16 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
           }} />
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: 0,
-            background: '#F5F0E6', borderRadius: '26px 26px 0 0',
+            background: '#F7F5F1', borderRadius: '26px 26px 0 0',
             zIndex: 41, padding: '22px 24px 36px',
             animation: 'flSheetUp .28s cubic-bezier(.22,1,.36,1)',
             boxShadow: '0 -12px 32px -12px rgba(40,30,18,.4)',
           }}>
-            <div style={{ width: 38, height: 5, borderRadius: 3, background: '#D8CDB6', margin: '0 auto 20px' }} />
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#33291C', marginBottom: 6 }}>
+            <div style={{ width: 38, height: 5, borderRadius: 3, background: '#DDD6CA', margin: '0 auto 20px' }} />
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>
               Contact {ownerName}
             </div>
-            <div style={{ fontSize: 14, color: '#8A7F6B', marginBottom: 22 }}>
+            <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>
               Choose how to send your borrow request:
             </div>
 
@@ -227,30 +212,24 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
               <ContactBtn icon="💬" label="WhatsApp" sub={book.Users?.phone} onClick={openWhatsApp} color="#25D366" />
               <ContactBtn icon="📱" label="SMS" sub={book.Users?.phone} onClick={openSMS} color="#5A7FE0" />
             </>) : (
-              <div style={{ fontSize: 14, color: '#A8997E', marginBottom: 14, fontStyle: 'italic' }}>
+              <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
                 {ownerName} hasn't added a phone number.
               </div>
             )}
 
             {ownerEmail ? (
-              <ContactBtn icon="✉️" label="Email" sub={book.Users?.email} onClick={openEmail} color="#B45A3C" />
+              <ContactBtn icon="✉️" label="Email" sub={book.Users?.email} onClick={openEmail} color="#C05A3E" />
             ) : (
-              <div style={{ fontSize: 14, color: '#A8997E', marginBottom: 14, fontStyle: 'italic' }}>
+              <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
                 {ownerName} hasn't added an email address.
               </div>
             )}
 
-            {!ownerPhone && !ownerEmail && (
-              <div style={{ background: '#FBF7EE', border: '1.5px solid #E8DFCC', borderRadius: 14, padding: 16, fontSize: 14, color: '#8A7F6B', lineHeight: 1.5 }}>
-                {ownerName} hasn't added contact info yet.
-              </div>
-            )}
-
             <button onClick={() => setShowContact(false)} style={{
-              marginTop: 18, width: '100%', border: '1.5px solid #E2D9C6',
+              marginTop: 18, width: '100%', border: '1.5px solid #E7E1D6',
               background: 'transparent', borderRadius: 14, padding: 14,
               fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16,
-              color: '#7A6F58', cursor: 'pointer',
+              color: '#6E675C', cursor: 'pointer',
             }}>Cancel</button>
           </div>
         </>
@@ -262,7 +241,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
 function ContactBtn({ icon, label, sub, onClick, color }) {
   return (
     <button onClick={onClick} style={{
-      width: '100%', border: '1.5px solid #E8DFCC', background: '#FFFCF5',
+      width: '100%', border: '1.5px solid #ECE7DE', background: '#FFFFFF',
       borderRadius: 14, padding: '14px 16px', marginBottom: 10,
       display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left',
     }}>
@@ -270,10 +249,10 @@ function ContactBtn({ icon, label, sub, onClick, color }) {
         {icon}
       </div>
       <div>
-        <div style={{ fontWeight: 600, fontSize: 15, color: '#33291C' }}>{label}</div>
-        <div style={{ fontSize: 13, color: '#A8997E', marginTop: 1 }}>{sub}</div>
+        <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622' }}>{label}</div>
+        <div style={{ fontSize: 13, color: '#A39B90', marginTop: 1 }}>{sub}</div>
       </div>
-      <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C4BAA8" strokeWidth="2.2" strokeLinecap="round">
+      <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round">
         <path d="M9 18l6-6-6-6" />
       </svg>
     </button>
