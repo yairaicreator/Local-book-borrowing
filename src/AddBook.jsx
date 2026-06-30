@@ -78,10 +78,14 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setBackPreview(URL.createObjectURL(file))
     setBackScanning(true)
     try {
-      const { description: desc, topic: t } = await analyzeBackCoverWithGemini(file)
-      if (desc && !description) setDescription(desc)
-      if (t && !topic) setTopic(t)
-      setOcrNote('✓ עטיפה אחורית נסרקה על ידי AI')
+      const { description: desc, topic: t, raw } = await analyzeBackCoverWithGemini(file)
+      if (desc) setDescription(desc)
+      if (t) setTopic(t)
+      if (desc) {
+        setOcrNote('✓ תיאור נקרא על ידי AI')
+      } else {
+        setOcrNote(`AI לא מצא תיאור. תגובה: "${raw?.slice(0, 100)}"`)
+      }
     } catch (err) {
       setOcrNote(`סריקת עטיפה אחורית נכשלה: ${err.message}`)
     } finally { setBackScanning(false) }

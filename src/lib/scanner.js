@@ -250,23 +250,27 @@ export async function analyzeBookCoverWithGemini(file) {
 }
 
 const GEMINI_BACK_PROMPT = `You are looking at the back cover of a book.
-Extract the book description — the paragraph that tells what the book is about.
+Read all the text on this cover and extract:
+1. The book description/synopsis (what the book is about)
+2. The topic/genre
 
-Output format — two lines, nothing else:
-DESCRIPTION: <the book synopsis/description in the original language>
-TOPIC: <one of: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, Other>
+Reply in EXACTLY this format:
+DESCRIPTION: <copy the synopsis text here, in the original language>
+TOPIC: <one word: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, or Other>
 
 Rules:
-- Description = the main synopsis paragraph(s), NOT reviews, NOT author bio, NOT awards
-- If no clear description found, write DESCRIPTION: (leave blank)
-- Do NOT add commentary, just output the two lines`
+- Description = the main story/synopsis paragraph, NOT reviews, NOT author bio, NOT awards
+- Copy the text exactly as it appears on the cover (Hebrew or English)
+- Do NOT add any other text or commentary`
+
+const TOPICS_LIST = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other']
 
 export async function analyzeBackCoverWithGemini(file) {
   const base64 = await fileToBase64(file)
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_BACK_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 600 },
+    generationConfig: { temperature: 0, maxOutputTokens: 800 },
   })
 
   let lastErr = 'no models tried'
@@ -286,11 +290,17 @@ export async function analyzeBackCoverWithGemini(file) {
 
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-    // Capture everything between DESCRIPTION: and TOPIC: (description can span multiple lines)
-    const description = raw.match(/DESCRIPTION:\s*([\s\S]*?)(?=\nTOPIC:|$)/i)?.[1]?.trim() || ''
-    const topicRaw = raw.match(/TOPIC:\s*(.+)/i)?.[1]?.trim() || ''
-    const topic = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other'].includes(topicRaw) ? topicRaw : null
-    return { description, topic }
+
+    // Extract description: everything after DESCRIPTION: up to the TOPIC: line
+    const descMatch = raw.match(/DESCRIPTION:\s*([^\n].+?)(?=\nTOPIC:|\nתיאור:|\nנושא:|$)/is)
+    // Also try Hebrew label
+    const hebrewDescMatch = raw.match(/(?:תיאור|סיכום)[:\s]+([^\n].+?)(?=\nTOPIC:|\nנושא:|$)/is)
+    const description = (descMatch?.[1] || hebrewDescMatch?.[1] || '').trim()
+
+    const topicRaw = (raw.match(/TOPIC:\s*(.+)/i)?.[1] || raw.match(/(?:נושא|ז'אנר)[:\s]+(.+)/i)?.[1] || '').trim()
+    const topic = TOPICS_LIST.includes(topicRaw) ? topicRaw : null
+
+    return { description, topic, raw }
   }
   throw new Error(`Gemini unavailable: ${lastErr}`)
 }
