@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, extractTitleAuthor, detectTopic, scanISBN, lookupISBN } from './lib/scanner'
+import { scanImageText, extractTitleAuthor, detectTopic, scanISBN, lookupISBN, searchBooks } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -17,8 +17,13 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [scanning, setScanning] = useState(false)
   const [backScanning, setBackScanning] = useState(false)
   const [isbnScanning, setIsbnScanning] = useState(false)
-  const [isbnNote, setIsbnNote] = useState('')   // success or error feedback
+  const [isbnNote, setIsbnNote] = useState('')
   const [isbnSuccess, setIsbnSuccess] = useState(false)
+  // title search
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [searching, setSearching] = useState(false)
+  const searchTimer = useRef(null)
   const [ocrNote, setOcrNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -26,6 +31,30 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const backRef = useRef()
   const isbnRef = useRef()
   const mobile = isMobileDevice()
+
+  // Debounced title search
+  useEffect(() => {
+    clearTimeout(searchTimer.current)
+    if (!searchQuery.trim()) { setSearchResults([]); return }
+    setSearching(true)
+    searchTimer.current = setTimeout(async () => {
+      const results = await searchBooks(searchQuery)
+      setSearchResults(results)
+      setSearching(false)
+    }, 500)
+    return () => clearTimeout(searchTimer.current)
+  }, [searchQuery])
+
+  function applyBook(book) {
+    if (book.title) setTitle(book.title)
+    if (book.author) setAuthor(book.author)
+    if (book.description) setDescription(book.description)
+    if (book.topic) setTopic(book.topic)
+    setIsbnSuccess(true)
+    setIsbnNote(`✓ Found: "${book.title}"`)
+    setSearchQuery('')
+    setSearchResults([])
+  }
 
   async function handleISBNChange(e) {
     const file = e.target.files[0]
@@ -36,25 +65,19 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     try {
       const isbn = await scanISBN(file)
       if (!isbn) {
-        setIsbnNote("No barcode found — take a close-up photo of just the barcode (bottom of the back cover), not the whole book.")
+        setIsbnNote("No barcode found — try a close-up photo of just the barcode, or search by title below.")
         return
       }
       const book = await lookupISBN(isbn)
       if (!book) {
-        setIsbnNote(`Barcode read (${isbn}) but not found in database — please type manually.`)
+        setIsbnNote(`Barcode read but not in database (local publisher code). Search by title below instead.`)
         return
       }
-      if (book.title) setTitle(book.title)
-      if (book.author) setAuthor(book.author)
-      if (book.description) setDescription(book.description)
-      if (book.topic) setTopic(book.topic)
-      setIsbnSuccess(true)
-      setIsbnNote(`✓ Found: "${book.title}"`)
+      applyBook(book)
     } catch (err) {
       setIsbnNote(`Error: ${err.message}`)
     } finally {
       setIsbnScanning(false)
-      // reset so the same file can be re-selected
       e.target.value = ''
     }
   }
@@ -214,7 +237,29 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
 
               {/* fields column */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                {ocrNote && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>{ocrNote}</div>}
+                {/* Title search */}
+                <div style={{ position: 'relative', marginBottom: 16 }}>
+                  <DLabel>Search by title</DLabel>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 12, padding: '11px 13px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
+                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Type a title or author…" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 14, color: '#2C2622', flex: 1 }} />
+                    {searching && <div style={{ width: 14, height: 14, border: '2px solid #E7E1D6', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite', flexShrink: 0 }} />}
+                    {searchQuery && !searching && <button onClick={() => { setSearchQuery(''); setSearchResults([]) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#A39B90', padding: 0, lineHeight: 1, fontSize: 17 }}>×</button>}
+                  </div>
+                  {searchResults.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 12, overflow: 'hidden', zIndex: 50, boxShadow: '0 8px 24px -8px rgba(44,38,34,.2)', marginTop: 4 }}>
+                      {searchResults.map((r, i) => (
+                        <button key={i} onClick={() => applyBook(r)} style={{ width: '100%', border: 'none', background: 'none', padding: '11px 14px', textAlign: 'left', cursor: 'pointer', borderBottom: i < searchResults.length - 1 ? '1px solid #F0ECE4' : 'none', display: 'block' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#F7F5F1'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2C2622', lineHeight: 1.3 }}>{r.title}</div>
+                          {r.author && <div style={{ fontSize: 12, color: '#7C756C', marginTop: 2 }}>{r.author}</div>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {(ocrNote || (isbnNote && !isbnSuccess)) && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>{ocrNote || isbnNote}</div>}
                 <DLabel>Title</DLabel>
                 <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Book title" style={dinputStyle} onFocus={f} onBlur={b} />
                 <DLabel>Author</DLabel>
@@ -282,6 +327,29 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           </div>
         </button>
         {isbnNote && !isbnSuccess && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 12, padding: '11px 14px', marginBottom: 10 }}>{isbnNote}</div>}
+
+        {/* Title search */}
+        <div style={{ position: 'relative', marginBottom: 18 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Or search by title</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, padding: '12px 14px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Type a title or author…" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', flex: 1 }} />
+            {searching && <div style={{ width: 16, height: 16, border: '2px solid #E7E1D6', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite', flexShrink: 0 }} />}
+            {searchQuery && !searching && <button onClick={() => { setSearchQuery(''); setSearchResults([]) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#A39B90', padding: 0, lineHeight: 1, fontSize: 18 }}>×</button>}
+          </div>
+          {searchResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, overflow: 'hidden', zIndex: 10, boxShadow: '0 8px 24px -8px rgba(44,38,34,.2)', marginTop: 4 }}>
+              {searchResults.map((r, i) => (
+                <button key={i} onClick={() => applyBook(r)} style={{ width: '100%', border: 'none', background: 'none', padding: '12px 16px', textAlign: 'left', cursor: 'pointer', borderBottom: i < searchResults.length - 1 ? '1px solid #F0ECE4' : 'none', display: 'block' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#F7F5F1'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', lineHeight: 1.3 }}>{r.title}</div>
+                  {r.author && <div style={{ fontSize: 13, color: '#7C756C', marginTop: 2 }}>{r.author}</div>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* front cover */}
         <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Front cover — AI reads title &amp; author</div>

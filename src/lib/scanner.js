@@ -50,16 +50,35 @@ export async function lookupISBN(isbn) {
     const data = await res.json()
     const info = data.items?.[0]?.volumeInfo
     if (!info) return null
-
-    return {
-      title: info.title || '',
-      author: (info.authors || []).join(', '),
-      description: info.description || '',
-      topic: mapCategory(info.categories),
-      coverUrl: info.imageLinks?.thumbnail?.replace('http:', 'https:') || null,
-    }
+    return bookInfoToResult(info)
   } catch {
     return null
+  }
+}
+
+// Search Google Books by free-text query (title, author, or both).
+// Returns up to 5 result objects.
+export async function searchBooks(query) {
+  if (!query.trim()) return []
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5`
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.items || []).map(item => bookInfoToResult(item.volumeInfo))
+  } catch {
+    return []
+  }
+}
+
+function bookInfoToResult(info) {
+  return {
+    title: info.title || '',
+    author: (info.authors || []).join(', '),
+    description: info.description || '',
+    topic: mapCategory(info.categories),
+    coverUrl: info.imageLinks?.thumbnail?.replace('http:', 'https:') || null,
   }
 }
 
