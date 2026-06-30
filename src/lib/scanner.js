@@ -269,7 +269,7 @@ export async function analyzeBackCoverWithGemini(file) {
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_BACK_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 800 },
+    generationConfig: { temperature: 0, maxOutputTokens: 3000 },
   })
 
   let lastErr = 'no models tried'
