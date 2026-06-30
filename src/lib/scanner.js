@@ -58,14 +58,20 @@ export async function lookupISBN(isbn) {
   }
 }
 
+const HEBREW_RE = /[֐-׿]/
+
 // Search by title/author. Tries Google Books first, falls back to Open Library.
+// When the query contains Hebrew, restricts Google Books to Hebrew-language editions.
 export async function searchBooks(query) {
   if (!query.trim()) return []
+
+  const isHebrew = HEBREW_RE.test(query)
+  const langParam = isHebrew ? '&langRestrict=iw' : ''
 
   // 1. Google Books (with API key for higher quota)
   try {
     const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${BOOKS_KEY}`
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${BOOKS_KEY}${langParam}`
     )
     if (res.ok) {
       const data = await res.json()
@@ -194,15 +200,15 @@ export async function analyzeBookCoverWithGemini(file) {
 
   if (!res.ok) {
     const body = await res.text()
-    throw new Error(`Gemini ${res.status}: ${body.slice(0, 120)}`)
+    // Surface the real error so it appears in the OCR note for debugging
+    throw new Error(`Gemini ${res.status}: ${body.slice(0, 200)}`)
   }
 
   const data = await res.json()
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
 
-  // Strip markdown code fences if Gemini wraps the JSON
   const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-  const result = JSON.parse(jsonStr) // throws if malformed
+  const result = JSON.parse(jsonStr)
 
   if (!result.title && !result.author) throw new Error('Gemini returned empty title and author')
   return { title: result.title || '', author: result.author || '' }

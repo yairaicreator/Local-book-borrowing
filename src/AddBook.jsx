@@ -111,15 +111,18 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         return
       }
 
-      // ── Option B: auto-fill search from OCR text (Gemini failed) ─────────
+      // ── Option B: auto-fill search from first 2 OCR lines (Gemini failed) ─
+      const geminiErr = geminiResult.reason?.message || 'שגיאה לא ידועה'
       const ocrText = ocrResult.status === 'fulfilled' ? ocrResult.value.text : ''
       if (ocrText.trim()) {
+        // Use only the first 2 lines — title is line 1, author line 2.
+        // Skipping further lines avoids sending taglines/subtitles to the search.
         const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 1)
-        const query = lines.slice(0, 4).join(' ')
-        setSearchQuery(query)   // triggers the debounced search automatically
-        setOcrNote('AI לא הצליח לזהות — תוצאות חיפוש הוצגו למטה, בחר את הספר הנכון.')
+        const query = lines.slice(0, 2).join(' ')
+        setSearchQuery(query)
+        setOcrNote(`Gemini: ${geminiErr} — חפש את הספר בתיבה למטה ובחר תוצאה.`)
       } else {
-        setOcrNote('לא נמצא טקסט בעטיפה — אנא הקלד ידנית.')
+        setOcrNote(`Gemini: ${geminiErr} — לא נמצא טקסט בעטיפה, אנא הקלד ידנית.`)
       }
     } catch (err) {
       setOcrNote(`שגיאה בסריקה: ${err.message}`)
