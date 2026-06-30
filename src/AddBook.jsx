@@ -36,7 +36,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     try {
       const isbn = await scanISBN(file)
       if (!isbn) {
-        setIsbnNote("No barcode found — make sure the ISBN barcode is visible and well-lit.")
+        setIsbnNote("No barcode found — take a close-up photo of just the barcode (bottom of the back cover), not the whole book.")
         return
       }
       const book = await lookupISBN(isbn)
@@ -277,7 +277,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
               {isbnScanning ? 'Scanning barcode…' : isbnSuccess ? 'Auto filled!' : 'Auto fill'}
             </div>
             <div style={{ fontSize: 13, color: '#7C756C', marginTop: 2 }}>
-              {isbnSuccess ? isbnNote : 'Take a photo of the barcode on the back cover'}
+              {isbnSuccess ? isbnNote : 'Close-up photo of just the barcode'}
             </div>
           </div>
         </button>

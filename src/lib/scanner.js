@@ -4,15 +4,34 @@ const VISION_KEY = 'AIzaSyDC9s4Ge7V5XhygYjvEErv7Y-4BnnF0SZc'
 
 // ─── ISBN ────────────────────────────────────────────────────────────────────
 
-// Read an ISBN barcode from a photo. Returns the ISBN string or null.
+// Read a barcode from a photo. Returns the numeric string or null.
+// Strategy: native BarcodeDetector (Chrome/Android) first — it handles real photos
+// much better than ZXing. Falls back to ZXing for other browsers.
 export async function scanISBN(file) {
-  const reader = new BrowserMultiFormatReader()
   const url = URL.createObjectURL(file)
   try {
+    // 1. Native BarcodeDetector (Chrome desktop, Chrome Android, Edge)
+    if ('BarcodeDetector' in window) {
+      try {
+        const detector = new window.BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'],
+        })
+        const img = new Image()
+        img.src = url
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej })
+        const barcodes = await detector.detect(img)
+        if (barcodes.length > 0) {
+          const code = barcodes[0].rawValue.replace(/\D/g, '')
+          if (code.length >= 8) return code
+        }
+      } catch { /* fall through to ZXing */ }
+    }
+
+    // 2. ZXing fallback (Firefox, Safari)
+    const reader = new BrowserMultiFormatReader()
     const result = await reader.decodeFromImageUrl(url)
     const text = result.getText().replace(/\D/g, '')
-    // ISBNs are 10 or 13 digits
-    return text.length === 13 || text.length === 10 ? text : null
+    return text.length >= 8 ? text : null
   } catch {
     return null
   } finally {
