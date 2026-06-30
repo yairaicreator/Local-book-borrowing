@@ -250,15 +250,15 @@ export async function analyzeBookCoverWithGemini(file) {
 }
 
 const GEMINI_BACK_PROMPT = `Look at this book back cover image.
-Copy the synopsis/description paragraph exactly as written (in Hebrew or English).
-Then on the last line write the genre.
+Copy ALL the text you can read on the cover, word for word, in the original language (Hebrew or English).
+Then on the very last line write the genre.
 
-Output format — description first, genre last:
-<paste the synopsis text here, word for word>
+Output format:
+<all the text from the back cover, copied exactly>
 TOPIC: Fiction
 
 Replace "Fiction" with one of: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, Other.
-Do NOT add any labels, introductions, or commentary. Just the synopsis text and the TOPIC line.`
+Do NOT summarize. Do NOT add labels or commentary. Just copy all the text and end with the TOPIC line.`
 
 const TOPICS_LIST = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other']
 
