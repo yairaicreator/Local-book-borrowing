@@ -108,7 +108,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
           </button>
         </div>
 
-        <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px 24px' }}>
+        <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px env(safe-area-inset-bottom, 34px)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22 }}>
             {showBack && book.back_image_url
               ? <img src={book.back_image_url} alt="עטיפה אחורית" style={{ width: 176, height: 250, objectFit: 'cover', borderRadius: 10, boxShadow: '0 4px 16px -6px rgba(40,30,18,.35)' }} />
@@ -189,27 +189,27 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
               {inReadingList ? 'נשמר לרשימת הקריאה' : 'הוסף לרשימת הקריאה'}
             </button>
           )}
-        </div>
 
-        {isOwnBook && onEdit && (
-          <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center' }}>
-              הוספת ספר זה — אחרים יכולים לשאול ממך.
+          {isOwnBook && onEdit && (
+            <div style={{ marginTop: 10, paddingTop: 18, borderTop: '1px solid #ECE7DE' }}>
+              <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center', marginBottom: 12 }}>
+                הוספת ספר זה — אחרים יכולים לשאול ממך.
+              </div>
+              <button onClick={() => onEdit(book)} style={{
+                width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF',
+                borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif",
+                fontWeight: 600, fontSize: 16, color: '#2C2622', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                ערוך ספר
+              </button>
             </div>
-            <button onClick={() => onEdit(book)} style={{
-              width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF',
-              borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif",
-              fontWeight: 600, fontSize: 16, color: '#2C2622', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              ערוך ספר
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {showContact && (

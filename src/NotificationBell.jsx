@@ -17,7 +17,7 @@ export default function NotificationBell({ currentUser, small = false }) {
   async function fetchNotifs() {
     const { data } = await supabase
       .from('Notifications')
-      .select('*, Books(title), Users!sender_id(name)')
+      .select('id, message, is_read, created_at')
       .eq('recipient_id', currentUser.id)
       .order('created_at', { ascending: false })
       .limit(20)
