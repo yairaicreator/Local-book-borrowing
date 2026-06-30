@@ -183,35 +183,36 @@ const GEMINI_MODELS = [
   'gemini-1.5-flash',
 ]
 
-// Plain-text format is far more resilient than JSON.
-// Even a truncated response gives us the title, which is the most important field.
-const GEMINI_PROMPT = `This is a book cover. Find the title and author name.
-- Title = largest / most prominent text
-- Author = person's name (usually smaller, near top or bottom)
-- Text may be in Hebrew or English
-- Ignore taglines, award labels, publisher names, subtitles
+const GEMINI_PROMPT = `You are looking at a book cover photo.
+Your only job: output the book title and author name.
 
-Reply in EXACTLY this format, two lines only:
-TITLE: <title>
-AUTHOR: <author>`
+Output format — two lines, nothing else:
+TITLE: <the book title>
+AUTHOR: <the author name>
+
+Rules:
+- Title = the largest or most prominent text on the cover
+- Author = the person's name (usually smaller text)
+- The text may be in Hebrew or English — copy it exactly as written
+- Do NOT describe the image, do NOT add commentary, do NOT say "upside down" or anything else
+- If you cannot find the author, write AUTHOR: unknown
+- Output ONLY the two lines above, no other text`
 
 function parseGeminiResponse(raw) {
-  // Try English labels (TITLE: / AUTHOR:)
-  let title = raw.match(/TITLE:\s*(.+)/i)?.[1]?.trim() || ''
-  let author = raw.match(/AUTHOR:\s*(.+)/i)?.[1]?.trim() || ''
+  // Try English labels
+  let title = raw.match(/^TITLE:\s*(.+)/im)?.[1]?.trim() || ''
+  let author = raw.match(/^AUTHOR:\s*(.+)/im)?.[1]?.trim() || ''
 
-  // Try Hebrew labels (כותרת: / מחבר: / סופר:) — Gemini sometimes answers in the book's language
-  if (!title) title = raw.match(/כותרת[:\s]+(.+)/)?.[1]?.trim() || ''
-  if (!author) author = raw.match(/(?:מחבר|סופר|מחברת)[:\s]+(.+)/)?.[1]?.trim() || ''
+  // Try Hebrew labels — Gemini sometimes responds in the book's language
+  if (!title) title = raw.match(/^כותרת[:\s]+(.+)/m)?.[1]?.trim() || ''
+  if (!author) author = raw.match(/^(?:מחבר|סופר|מחברת)[:\s]+(.+)/m)?.[1]?.trim() || ''
 
-  // Last resort: if response is exactly 1-2 short lines with no label, treat first as title
-  if (!title) {
-    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 1 && l.length < 120)
-    if (lines.length >= 1) title = lines[0]
-    if (lines.length >= 2 && !author) author = lines[1]
-  }
+  // Strip any stray quotes Gemini added around the value
+  title = title.replace(/^["'"״]|["'"״]$/g, '').trim()
+  author = author.replace(/^["'"״]|["'"״]$/g, '').trim()
+  if (author.toLowerCase() === 'unknown') author = ''
 
-  if (!title && !author) throw new Error(`Gemini format unknown: "${raw.slice(0, 120)}"`)
+  if (!title) throw new Error(`Gemini format unknown: "${raw.slice(0, 120)}"`)
   return { title, author }
 }
 
