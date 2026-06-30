@@ -475,12 +475,21 @@ const TAGLINE_PATTERNS = [
   /מיליון/,
 ]
 
+function isReadableLine(line) {
+  // Keep only lines that are mostly Hebrew or Latin characters.
+  // Decorative/stylized fonts often cause Vision to output garbage from other
+  // scripts (Devanagari, Cyrillic, CJK, etc.) — those lines are useless for search.
+  const readable = (line.match(/[֐-׿A-zza-z .,'\-]/g) || []).length
+  return readable / line.length >= 0.5
+}
+
 function buildSearchQuery(ocrText) {
   const lines = ocrText
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 1)
-    .filter(l => !TAGLINE_PATTERNS.some(p => p.test(l)))
+    .filter(isReadableLine)                                    // drop garbled lines
+    .filter(l => !TAGLINE_PATTERNS.some(p => p.test(l)))      // drop taglines
 
   // Take up to 3 cleaned lines: typically title (may span 2 lines) + author
   return lines.slice(0, 3).join(' ')
