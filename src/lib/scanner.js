@@ -269,11 +269,11 @@ export async function analyzeBackCoverWithGemini(file) {
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_BACK_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 1200 },
+    generationConfig: { temperature: 0, maxOutputTokens: 800 },
   })
 
   let lastErr = 'no models tried'
-  let retryCount = 0
+  let rateLimitCount = 0
   for (let i = 0; i < GEMINI_MODELS.length; i++) {
     const model = GEMINI_MODELS[i]
     const res = await fetch(
@@ -281,15 +281,12 @@ export async function analyzeBackCoverWithGemini(file) {
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
     )
     if (res.status === 429) {
-      if (retryCount < 3) {
-        retryCount++
-        await new Promise(r => setTimeout(r, retryCount * 4000))
-        i-- // retry same model
-        continue
-      }
-      throw new Error('מגבלת קצב של Gemini — המתן מספר שניות ונסה שנית')
+      rateLimitCount++
+      lastErr = `${model} rate limited`
+      // Brief pause then try the next model — retrying same model rarely helps
+      await new Promise(r => setTimeout(r, 2000))
+      continue
     }
-    retryCount = 0
     if (res.status === 404) { lastErr = `${model} not found`; continue }
     if (!res.ok) { lastErr = `${model} ${res.status}`; continue }
 
@@ -299,15 +296,12 @@ export async function analyzeBackCoverWithGemini(file) {
     const topicRaw = (raw.match(/TOPIC:\s*(.+)/i)?.[1] || '').trim()
     const topic = TOPICS_LIST.includes(topicRaw) ? topicRaw : null
 
-    let description = raw.replace(/\nTOPIC:.+/i, '').trim()
-
-    if (/^[A-Za-z]/.test(description) && description.includes('"')) {
-      const quoted = [...description.matchAll(/"([^"]{10,})"/g)].map(m => m[1])
-      if (quoted.length) description = quoted.join(' ')
-    }
+    // Strip the TOPIC line from the description — handle it anywhere in the text
+    let description = raw.replace(/\n?TOPIC:\s*.+/i, '').trim()
 
     return { description, topic, raw }
   }
+  if (rateLimitCount > 0) throw new Error('מגבלת קצב של Gemini — המתן מספר שניות ונסה שנית')
   throw new Error(`Gemini לא זמין: ${lastErr}`)
 }
 

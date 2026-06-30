@@ -59,17 +59,33 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
     setTimeout(() => { setShowContact(false); setNotifSent(false) }, 1400)
   }
 
+  function tapLink(url) {
+    // Safest cross-browser/iOS approach: synthetic anchor click preserves the user gesture
+    // without navigating the SPA away (unlike window.location.href).
+    const a = document.createElement('a')
+    a.href = url
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
+  function formatWaPhone(raw) {
+    const digits = (raw || '').replace(/\D/g, '')
+    // Israeli numbers: 05XXXXXXXX (10 digits) → 97250XXXXXXX (remove leading 0, add 972)
+    if (digits.startsWith('0') && digits.length === 10) return '972' + digits.slice(1)
+    return digits
+  }
   function openWhatsApp() {
-    // Use location.href for deep links — window.open is blocked by iOS after async calls
-    window.location.href = `https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`
+    tapLink(`https://wa.me/${formatWaPhone(ownerPhone)}?text=${encodeURIComponent(msgText)}`)
     recordBorrow(); setShowContact(false)
   }
   function openSMS() {
-    window.location.href = `sms:${ownerPhone}&body=${encodeURIComponent(msgText)}`
+    tapLink(`sms:${ownerPhone}&body=${encodeURIComponent(msgText)}`)
     recordBorrow(); setShowContact(false)
   }
   function openEmail() {
-    window.location.href = `mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`
+    tapLink(`mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`)
     recordBorrow(); setShowContact(false)
   }
 
