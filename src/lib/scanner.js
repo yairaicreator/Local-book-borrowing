@@ -177,41 +177,42 @@ export async function scanImageText(file) {
 // Send the image directly to Gemini and ask it to identify title + author.
 // Gemini understands visual layout so it knows big text = title, smaller = author.
 // Throws on any failure so the caller can fall through to Option B.
+// Try models in order until one responds successfully.
+// 404 = model not available in this API version → try next.
+// 429 = quota exceeded → stop immediately (switching model won't help for minute-limit).
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+
+const GEMINI_PROMPT = 'This is a book cover. The title is usually the largest text. The author name is usually smaller text below. Text may be in Hebrew (right-to-left). Ignore taglines, subtitles, prizes ("Nobel Prize"), publisher names. Return ONLY valid JSON, no markdown: {"title": "...", "author": "..."}'
+
 export async function analyzeBookCoverWithGemini(file) {
   const base64 = await fileToBase64(file)
   const mimeType = file.type || 'image/jpeg'
+  const body = JSON.stringify({
+    contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_PROMPT }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 200 },
+  })
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inlineData: { mimeType, data: base64 } },
-            { text: 'This is a book cover. The title is usually the largest text. The author name is usually smaller text. Text may be in Hebrew (right-to-left). Ignore subtitles, taglines (like "Nobel Prize winner"), publisher names, and series info. Return ONLY valid JSON with no markdown formatting: {"title": "...", "author": ""}' }
-          ]
-        }],
-        generationConfig: { temperature: 0, maxOutputTokens: 200 }
-      })
+  let lastErr = 'no models tried'
+  for (const model of GEMINI_MODELS) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+    )
+    if (res.status === 429) {
+      const b = await res.text()
+      throw new Error(`Gemini 429 (quota): ${b.slice(0, 120)}`)
     }
-  )
+    if (res.status === 404) { lastErr = `${model} not found`; continue }
+    if (!res.ok) { lastErr = `${model} ${res.status}`; continue }
 
-  if (!res.ok) {
-    const body = await res.text()
-    // Surface the real error so it appears in the OCR note for debugging
-    throw new Error(`Gemini ${res.status}: ${body.slice(0, 200)}`)
+    const data = await res.json()
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+    const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+    const result = JSON.parse(jsonStr)
+    if (!result.title && !result.author) throw new Error('Gemini returned empty fields')
+    return { title: result.title || '', author: result.author || '' }
   }
-
-  const data = await res.json()
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-
-  const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-  const result = JSON.parse(jsonStr)
-
-  if (!result.title && !result.author) throw new Error('Gemini returned empty title and author')
-  return { title: result.title || '', author: result.author || '' }
+  throw new Error(`Gemini unavailable: ${lastErr}`)
 }
 
 // ─── Option B: Auto-search from OCR text ─────────────────────────────────────

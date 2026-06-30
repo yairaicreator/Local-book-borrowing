@@ -475,24 +475,22 @@ const TAGLINE_PATTERNS = [
   /מיליון/,
 ]
 
-function isReadableLine(line) {
-  // Keep only lines that are mostly Hebrew or Latin characters.
-  // Decorative/stylized fonts often cause Vision to output garbage from other
-  // scripts (Devanagari, Cyrillic, CJK, etc.) — those lines are useless for search.
-  const readable = (line.match(/[֐-׿A-zza-z .,'\-]/g) || []).length
-  return readable / line.length >= 0.5
-}
+const HEBREW_CHAR_RE = /[א-ת]/  // basic Hebrew alphabet
 
 function buildSearchQuery(ocrText) {
-  const lines = ocrText
+  const allLines = ocrText
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 1)
-    .filter(isReadableLine)                                    // drop garbled lines
-    .filter(l => !TAGLINE_PATTERNS.some(p => p.test(l)))      // drop taglines
+    .filter(l => !TAGLINE_PATTERNS.some(p => p.test(l)))
 
-  // Take up to 3 cleaned lines: typically title (may span 2 lines) + author
-  return lines.slice(0, 3).join(' ')
+  // Prefer lines that contain Hebrew characters.
+  // Decorative fonts are often misread as random Latin/Devanagari/Cyrillic —
+  // those lines have zero Hebrew chars and should be skipped when Hebrew lines exist.
+  const hebrewLines = allLines.filter(l => HEBREW_CHAR_RE.test(l))
+  const candidates = hebrewLines.length > 0 ? hebrewLines : allLines
+
+  return candidates.slice(0, 3).join(' ')
 }
 
 function SearchDropdown({ results, empty, onPick }) {
