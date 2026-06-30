@@ -1,6 +1,7 @@
 import { BrowserMultiFormatReader } from '@zxing/browser'
 
 const VISION_KEY = 'AIzaSyDC9s4Ge7V5XhygYjvEErv7Y-4BnnF0SZc'
+const BOOKS_KEY = 'AIzaSyC61fCfD-7HHYKBN0T8oX25TjIfWQrxORI'
 
 // ─── ISBN ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ export async function scanISBN(file) {
 export async function lookupISBN(isbn) {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1`
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=1&key=${BOOKS_KEY}`
     )
     if (!res.ok) return null
     const data = await res.json()
@@ -63,7 +64,7 @@ export async function searchBooks(query) {
   // 1. Google Books (with API key for higher quota)
   try {
     const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${VISION_KEY}`
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${BOOKS_KEY}`
     )
     if (res.ok) {
       const data = await res.json()
