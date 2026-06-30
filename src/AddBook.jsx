@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, analyzeBookCoverWithGemini, detectTopic, scanISBN, lookupISBN, searchBooks } from './lib/scanner'
+import { scanImageText, analyzeBookCoverWithGemini, analyzeBackCoverWithGemini, detectTopic, scanISBN, lookupISBN, searchBooks } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -132,14 +132,12 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setBackPreview(URL.createObjectURL(file))
     setBackScanning(true)
     try {
-      const { text } = await scanImageText(file)
-      if (text) {
-        if (!description) setDescription(text.replace(/\n/g, ' ').trim())
-        const guessed = detectTopic(text)
-        if (guessed) setTopic(guessed)
-      }
+      const { description: desc, topic: t } = await analyzeBackCoverWithGemini(file)
+      if (desc && !description) setDescription(desc)
+      if (t && !topic) setTopic(t)
+      setOcrNote('✓ עטיפה אחורית נסרקה על ידי AI')
     } catch (err) {
-      setOcrNote(`Back cover scan failed: ${err.message}`)
+      setOcrNote(`סריקת עטיפה אחורית נכשלה: ${err.message}`)
     } finally { setBackScanning(false) }
   }
 

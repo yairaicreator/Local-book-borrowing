@@ -249,6 +249,51 @@ export async function analyzeBookCoverWithGemini(file) {
   throw new Error(`Gemini unavailable: ${lastErr}`)
 }
 
+const GEMINI_BACK_PROMPT = `You are looking at the back cover of a book.
+Extract the book description — the paragraph that tells what the book is about.
+
+Output format — two lines, nothing else:
+DESCRIPTION: <the book synopsis/description in the original language>
+TOPIC: <one of: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, Other>
+
+Rules:
+- Description = the main synopsis paragraph(s), NOT reviews, NOT author bio, NOT awards
+- If no clear description found, write DESCRIPTION: (leave blank)
+- Do NOT add commentary, just output the two lines`
+
+export async function analyzeBackCoverWithGemini(file) {
+  const base64 = await fileToBase64(file)
+  const mimeType = file.type || 'image/jpeg'
+  const body = JSON.stringify({
+    contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_BACK_PROMPT }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 600 },
+  })
+
+  let lastErr = 'no models tried'
+  let retried = false
+  for (let i = 0; i < GEMINI_MODELS.length; i++) {
+    const model = GEMINI_MODELS[i]
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+    )
+    if (res.status === 429) {
+      if (!retried) { retried = true; await new Promise(r => setTimeout(r, 3000)); i--; continue }
+      throw new Error('rate limit')
+    }
+    if (res.status === 404) { lastErr = `${model} not found`; continue }
+    if (!res.ok) { lastErr = `${model} ${res.status}`; continue }
+
+    const data = await res.json()
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+    const description = raw.match(/DESCRIPTION:\s*(.+)/i)?.[1]?.trim() || ''
+    const topicRaw = raw.match(/TOPIC:\s*(.+)/i)?.[1]?.trim() || ''
+    const topic = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other'].includes(topicRaw) ? topicRaw : null
+    return { description, topic }
+  }
+  throw new Error(`Gemini unavailable: ${lastErr}`)
+}
+
 // ─── Option B: Auto-search from OCR text ─────────────────────────────────────
 // Smart OCR: search Google Books + Open Library with the full cover text.
 // If a book is found whose title words appear in the OCR, return full book info.
