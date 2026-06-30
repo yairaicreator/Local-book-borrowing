@@ -13,6 +13,7 @@ export default function Home({ currentUser }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('user')
   const [activeBook, setActiveBook] = useState(null)
+  const [editBook, setEditBook] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [toast, setToast] = useState('')
@@ -232,10 +233,13 @@ export default function Home({ currentUser }) {
       </button>
 
       {activeBook && (
-        <BookDetail book={activeBook} currentUser={currentUser} onClose={() => setActiveBook(null)} onBorrow={handleBorrow} />
+        <BookDetail book={activeBook} currentUser={currentUser} onClose={() => setActiveBook(null)} onBorrow={handleBorrow} onEdit={b => { setActiveBook(null); setEditBook(b) }} />
       )}
       {showAdd && (
         <AddBook currentUser={currentUser} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('Book saved to your shelf'); fetchBooks() }} />
+      )}
+      {editBook && (
+        <AddBook currentUser={currentUser} bookToEdit={editBook} onClose={() => setEditBook(null)} onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }} />
       )}
       {showProfile && (
         <Profile currentUser={currentUser} onClose={() => setShowProfile(false)} />

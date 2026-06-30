@@ -12,6 +12,8 @@ export default function HomeDesktop({ currentUser }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('user')
   const [activeBook, setActiveBook] = useState(null)
+  const [showBack, setShowBack] = useState(false)
+  const [editBook, setEditBook] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showContact, setShowContact] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -184,7 +186,7 @@ export default function HomeDesktop({ currentUser }) {
                 {group.books.map(book => {
                   const bs = STATUS[book.status] || STATUS.available
                   return (
-                    <div key={book.id} onClick={() => setActiveBook(book)} style={{ cursor: 'pointer' }}>
+                    <div key={book.id} onClick={() => { setActiveBook(book); setShowBack(false) }} style={{ cursor: 'pointer' }}>
                       <div style={{ position: 'relative', width: '100%', aspectRatio: '128/182', borderRadius: 11, overflow: 'hidden', boxShadow: '0 10px 22px -10px rgba(60,48,30,.42)', transition: 'transform .18s, box-shadow .18s' }}
                         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 18px 32px -12px rgba(60,48,30,.5)' }}
                         onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 10px 22px -10px rgba(60,48,30,.42)' }}>
@@ -224,8 +226,16 @@ export default function HomeDesktop({ currentUser }) {
         <div onClick={() => { setActiveBook(null); setShowContact(false) }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,18,.46)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'flFade .2s ease', padding: 40 }}>
           <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: 760, maxWidth: '100%', maxHeight: '88vh', background: '#F7F5F1', borderRadius: 22, overflow: 'hidden', display: 'flex', boxShadow: '0 30px 70px -20px rgba(40,30,18,.55)', animation: 'flPop .26s cubic-bezier(.22,1,.36,1)' }}>
             {/* left: cover */}
-            <div style={{ width: 300, flexShrink: 0, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', borderRight: '1px solid #E7E1D6' }}>
-              <BookCover book={activeBook} width={206} height={293} fontSize={26} authorSize={11} />
+            <div style={{ width: 300, flexShrink: 0, background: '#F1ECE3', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', borderRight: '1px solid #E7E1D6', gap: 12 }}>
+              {showBack && activeBook.back_image_url
+                ? <img src={activeBook.back_image_url} alt="back cover" style={{ width: 206, height: 293, objectFit: 'cover', borderRadius: 10, boxShadow: '0 4px 18px -6px rgba(40,30,18,.4)' }} />
+                : <BookCover book={activeBook} width={206} height={293} fontSize={26} authorSize={11} />
+              }
+              {activeBook.back_image_url && (
+                <button onClick={() => setShowBack(v => !v)} style={{ border: '1.5px solid #D8D1C4', background: '#F7F5F1', borderRadius: 20, padding: '5px 16px', fontSize: 13, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#7C756C', cursor: 'pointer' }}>
+                  {showBack ? '← עטיפה קדמית' : 'עטיפה אחורית →'}
+                </button>
+              )}
             </div>
             {/* right: info */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -248,7 +258,15 @@ export default function HomeDesktop({ currentUser }) {
                 </div>
               </div>
               <div style={{ padding: '18px 34px 26px', borderTop: '1px solid #ECE7DE' }}>
-                {activeBook.add_by === currentUser.id && <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center', marginBottom: 10 }}>הוספת ספר זה — אחרים יכולים לשאול אותו ממך.</div>}
+                {activeBook.add_by === currentUser.id && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <div style={{ flex: 1, fontSize: 13, color: '#A39B90' }}>הוספת ספר זה — אחרים יכולים לשאול אותו ממך.</div>
+                    <button onClick={() => { setEditBook(activeBook); setActiveBook(null); setShowContact(false) }} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '7px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      ערוך
+                    </button>
+                  </div>
+                )}
                 <button onClick={() => { if (!borrowDisabled) setShowContact(true) }} disabled={borrowDisabled} style={{ width: '100%', border: 'none', borderRadius: 14, padding: 16, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: borrowInk, background: borrowBg, cursor: borrowCursor }}>
                   {borrowLabel}
                 </button>
@@ -286,6 +304,11 @@ export default function HomeDesktop({ currentUser }) {
       {/* ── Add Book Modal ── */}
       {showAdd && (
         <AddBook currentUser={currentUser} desktop onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('Book saved to your shelf'); fetchBooks() }} />
+      )}
+
+      {/* ── Edit Book Modal ── */}
+      {editBook && (
+        <AddBook currentUser={currentUser} desktop bookToEdit={editBook} onClose={() => setEditBook(null)} onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }} />
       )}
 
       {/* ── Profile overlay ── */}

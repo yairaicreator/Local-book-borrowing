@@ -5,15 +5,17 @@ import { analyzeBookCoverWithGemini, analyzeBackCoverWithGemini, searchBooks } f
 
 const isMobileDevice = () => window.innerWidth < 640
 
-export default function AddBook({ currentUser, onClose, onSaved, desktop = false }) {
-  const [title, setTitle] = useState('')
-  const [author, setAuthor] = useState('')
-  const [description, setDescription] = useState('')
-  const [topic, setTopic] = useState(TOPICS[0])
-  const [status, setStatus] = useState('available')
+export default function AddBook({ currentUser, onClose, onSaved, desktop = false, bookToEdit = null }) {
+  const editing = !!bookToEdit
+  const [title, setTitle] = useState(bookToEdit?.title || '')
+  const [author, setAuthor] = useState(bookToEdit?.author || '')
+  const [description, setDescription] = useState(bookToEdit?.description || '')
+  const [topic, setTopic] = useState(bookToEdit?.topic || TOPICS[0])
+  const [status, setStatus] = useState(bookToEdit?.status || 'available')
   const [imageFile, setImageFile] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [backPreview, setBackPreview] = useState(null)
+  const [imagePreview, setImagePreview] = useState(bookToEdit?.image_url || null)
+  const [backFile, setBackFile] = useState(null)
+  const [backPreview, setBackPreview] = useState(bookToEdit?.back_image_url || null)
   const [scanning, setScanning] = useState(false)
   const [backScanning, setBackScanning] = useState(false)
   // title search
@@ -75,6 +77,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   async function handleBackChange(e) {
     const file = e.target.files[0]
     if (!file) return
+    setBackFile(file)
     setBackPreview(URL.createObjectURL(file))
     setBackScanning(true)
     try {
@@ -96,7 +99,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setSaving(true)
     setError('')
     try {
-      let image_url = null
+      let image_url = editing ? (bookToEdit.image_url || null) : null
       if (imageFile) {
         const ext = imageFile.name.split('.').pop()
         const path = `${currentUser.id}/${Date.now()}.${ext}`
@@ -105,12 +108,30 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(path)
         image_url = urlData.publicUrl
       }
-      const { error: insErr } = await supabase.from('Books').insert({
-        title: title.trim(), author: author.trim(),
-        description: description.trim() || null,
-        topic, status, add_by: currentUser.id, image_url,
-      })
-      if (insErr) throw insErr
+      let back_image_url = editing ? (bookToEdit.back_image_url || null) : null
+      if (backFile) {
+        const ext = backFile.name.split('.').pop()
+        const path = `${currentUser.id}/back_${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage.from('book-images').upload(path, backFile, { upsert: false })
+        if (upErr) throw upErr
+        const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(path)
+        back_image_url = urlData.publicUrl
+      }
+      if (editing) {
+        const { error: updErr } = await supabase.from('Books').update({
+          title: title.trim(), author: author.trim(),
+          description: description.trim() || null,
+          topic, status, image_url, back_image_url,
+        }).eq('id', bookToEdit.id)
+        if (updErr) throw updErr
+      } else {
+        const { error: insErr } = await supabase.from('Books').insert({
+          title: title.trim(), author: author.trim(),
+          description: description.trim() || null,
+          topic, status, add_by: currentUser.id, image_url, back_image_url,
+        })
+        if (insErr) throw insErr
+      }
       onSaved()
     } catch (e) {
       setError(e.message || 'Something went wrong.')
@@ -126,7 +147,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         <div onClick={e => e.stopPropagation()} style={{ width: 680, maxWidth: '100%', maxHeight: '90vh', background: '#F7F5F1', borderRadius: 22, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 30px 70px -20px rgba(40,30,18,.55)', animation: 'flPop .26s cubic-bezier(.22,1,.36,1)' }}>
           {/* header */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '24px 30px', borderBottom: '1px solid #ECE7DE' }}>
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#2C2622' }}>הוספת ספר</div>
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#2C2622' }}>{editing ? 'עריכת ספר' : 'הוספת ספר'}</div>
             <button onClick={onClose} style={{ marginLeft: 'auto', width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#F0ECE4', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
             </button>
@@ -222,7 +243,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           <div style={{ padding: '18px 30px 24px', borderTop: '1px solid #ECE7DE', display: 'flex', gap: 12 }}>
             <button onClick={onClose} style={cancelBtnStyle}>ביטול</button>
             <button onClick={handleSave} disabled={!canSave} style={{ ...saveBtnStyle, background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
-              {saving ? 'שומר…' : 'שמור ספר'}
+              {saving ? 'שומר…' : editing ? 'שמור שינויים' : 'שמור ספר'}
             </button>
           </div>
         </div>
@@ -237,7 +258,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#F0ECE4', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
-        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622' }}>הוספת ספר</div>
+        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622' }}>{editing ? 'עריכת ספר' : 'הוספת ספר'}</div>
       </div>
 
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 30px' }}>
@@ -322,7 +343,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
 
       <div style={{ padding: '14px 22px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
         <button onClick={handleSave} disabled={!canSave} style={{ width: '100%', border: 'none', borderRadius: 16, padding: 17, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 17, color: '#F7F5F1', background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
-          {saving ? 'שומר…' : 'שמור ספר'}
+          {saving ? 'שומר…' : editing ? 'שמור שינויים' : 'שמור ספר'}
         </button>
       </div>
     </div>

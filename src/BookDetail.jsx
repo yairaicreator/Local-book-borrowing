@@ -3,10 +3,11 @@ import BookCover from './BookCover'
 import { STATUS, avatarPalette, initial } from './lib/utils'
 import { supabase } from './lib/supabase'
 
-export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
+export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdit }) {
   const [showContact, setShowContact] = useState(false)
   const [inReadingList, setInReadingList] = useState(false)
   const [rlLoading, setRlLoading] = useState(false)
+  const [showBack, setShowBack] = useState(false)
 
   useEffect(() => {
     supabase.from('reading_list')
@@ -108,8 +109,16 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
         </div>
 
         <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
-            <BookCover book={book} width={176} height={250} fontSize={23} authorSize={11} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22 }}>
+            {showBack && book.back_image_url
+              ? <img src={book.back_image_url} alt="back cover" style={{ width: 176, height: 250, objectFit: 'cover', borderRadius: 10, boxShadow: '0 4px 16px -6px rgba(40,30,18,.35)' }} />
+              : <BookCover book={book} width={176} height={250} fontSize={23} authorSize={11} />
+            }
+            {book.back_image_url && (
+              <button onClick={() => setShowBack(v => !v)} style={{ marginTop: 10, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 20, padding: '5px 14px', fontSize: 13, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#7C756C', cursor: 'pointer' }}>
+                {showBack ? '← עטיפה קדמית' : 'עטיפה אחורית →'}
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -173,8 +182,16 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow }) {
 
         <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
           {isOwnBook && (
-            <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center', marginBottom: 10 }}>
-              You added this book — others can borrow it from you.
+            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <div style={{ flex: 1, fontSize: 13, color: '#A39B90', display: 'flex', alignItems: 'center' }}>
+                הוספת ספר זה — אחרים יכולים לשאול ממך.
+              </div>
+              {onEdit && (
+                <button onClick={() => onEdit(book)} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '8px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                  ערוך
+                </button>
+              )}
             </div>
           )}
           <button onClick={borrowAction || undefined} disabled={!borrowAction} style={{
