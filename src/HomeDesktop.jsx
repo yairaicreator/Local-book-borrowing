@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { STATUS, avatarPalette, initial } from './lib/utils'
+import { STATUS, TOPIC_LABELS, avatarPalette, initial } from './lib/utils'
 import BookCover from './BookCover'
 import AddBook from './AddBook'
 import Profile from './Profile'
 import Toast from './Toast'
+import NotificationBell from './NotificationBell'
 
 export default function HomeDesktop({ currentUser }) {
   const [books, setBooks] = useState([])
@@ -67,8 +68,14 @@ export default function HomeDesktop({ currentUser }) {
   const navOn = (on) => on ? { bg: '#F1E7E2', color: '#C05A3E' } : { bg: 'transparent', color: '#6E675C' }
   const nu = navOn(filter === 'user'), nt = navOn(filter === 'topic')
 
-  function handleBorrow(book) {
-    showToast(`Request sent to ${book.Users?.name || 'the owner'}`)
+  async function handleBorrow(book) {
+    await supabase.from('Notifications').insert({
+      recipient_id: book.add_by,
+      sender_id: currentUser.id,
+      book_id: book.id,
+      message: `${currentUser.name || 'מישהו'} ביקש לשאול את "${book.title}"`,
+    })
+    showToast(`הבקשה נשלחה לבעלים`)
     setActiveBook(null)
   }
 
@@ -141,17 +148,19 @@ export default function HomeDesktop({ currentUser }) {
         </div>
 
         {/* user footer */}
-        <button onClick={() => setShowProfile(true)} style={{
-          display: 'flex', alignItems: 'center', gap: 11,
-          padding: '12px 8px 2px', marginTop: 14,
-          borderTop: '1px solid #E4DED3', border: 'none', background: 'none', cursor: 'pointer', width: '100%', textAlign: 'left',
-        }}>
-          <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: '#7A4A28', flexShrink: 0 }}>{initial(currentUser.name)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.name}</div>
-            <div style={{ fontSize: 12, color: '#A39B90' }}>המדף שלך</div>
-          </div>
-        </button>
+        <div style={{ borderTop: '1px solid #E4DED3', marginTop: 14, paddingTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={() => setShowProfile(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0,
+            padding: '4px 8px', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
+          }}>
+            <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: '#7A4A28', flexShrink: 0 }}>{initial(currentUser.name)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.name}</div>
+              <div style={{ fontSize: 12, color: '#A39B90' }}>המדף שלך</div>
+            </div>
+          </button>
+          <NotificationBell currentUser={currentUser} small />
+        </div>
       </aside>
 
       {/* ── Main ── */}
@@ -240,14 +249,20 @@ export default function HomeDesktop({ currentUser }) {
             {/* right: info */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '34px 34px 24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: s.color, background: s.bg, padding: '5px 12px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />{s.label}
                   </span>
-                  {activeBook.topic && <span style={{ fontSize: 13, fontWeight: 600, color: '#8A6A3A', background: '#F3ECDD', padding: '5px 12px', borderRadius: 999 }}>{activeBook.topic}</span>}
+                  {activeBook.topic && <span style={{ fontSize: 13, fontWeight: 600, color: '#8A6A3A', background: '#F3ECDD', padding: '5px 12px', borderRadius: 999 }}>{TOPIC_LABELS[activeBook.topic] || activeBook.topic}</span>}
+                  {!borrowDisabled && (
+                    <button onClick={() => setShowContact(true)} style={{ marginRight: 'auto', border: 'none', borderRadius: 999, padding: '6px 16px', background: '#C05A3E', color: '#F7F5F1', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                      בקש להשאיל
+                    </button>
+                  )}
                 </div>
                 <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 32, lineHeight: 1.14, color: '#2C2622', margin: '0 0 6px' }}>{activeBook.title}</h2>
-                <div style={{ fontSize: 17, color: '#7C756C', marginBottom: 20 }}>by {activeBook.author}</div>
+                <div style={{ fontSize: 17, color: '#7C756C', marginBottom: 20 }}>מאת {activeBook.author}</div>
                 {activeBook.description && <p style={{ fontSize: 16, lineHeight: 1.65, color: '#4A443D', margin: '0 0 22px' }}>{activeBook.description}</p>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FFFFFF', border: '1.5px solid #ECE7DE', borderRadius: 14, padding: '14px 16px' }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: ownerPal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: ownerPal.color, flexShrink: 0 }}>{initial(activeBook.Users?.name)}</div>
@@ -257,20 +272,15 @@ export default function HomeDesktop({ currentUser }) {
                   </div>
                 </div>
               </div>
-              <div style={{ padding: '18px 34px 26px', borderTop: '1px solid #ECE7DE' }}>
-                {activeBook.add_by === currentUser.id && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <div style={{ flex: 1, fontSize: 13, color: '#A39B90' }}>הוספת ספר זה — אחרים יכולים לשאול אותו ממך.</div>
-                    <button onClick={() => { setEditBook(activeBook); setActiveBook(null); setShowContact(false) }} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '7px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      ערוך
-                    </button>
-                  </div>
-                )}
-                <button onClick={() => { if (!borrowDisabled) setShowContact(true) }} disabled={borrowDisabled} style={{ width: '100%', border: 'none', borderRadius: 14, padding: 16, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: borrowInk, background: borrowBg, cursor: borrowCursor }}>
-                  {borrowLabel}
-                </button>
-              </div>
+              {activeBook.add_by === currentUser.id && (
+                <div style={{ padding: '18px 34px 22px', borderTop: '1px solid #ECE7DE', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, fontSize: 13, color: '#A39B90' }}>הוספת ספר זה — אחרים יכולים לשאול אותו ממך.</div>
+                  <button onClick={() => { setEditBook(activeBook); setActiveBook(null); setShowContact(false) }} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '7px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    ערוך
+                  </button>
+                </div>
+              )}
             </div>
             <button onClick={() => { setActiveBook(null); setShowContact(false) }} style={{ position: 'absolute', right: 18, top: 18, width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.85)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px -3px rgba(40,30,18,.3)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -303,7 +313,7 @@ export default function HomeDesktop({ currentUser }) {
 
       {/* ── Add Book Modal ── */}
       {showAdd && (
-        <AddBook currentUser={currentUser} desktop onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('Book saved to your shelf'); fetchBooks() }} />
+        <AddBook currentUser={currentUser} desktop onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('הספר נוסף למדף'); fetchBooks() }} />
       )}
 
       {/* ── Edit Book Modal ── */}

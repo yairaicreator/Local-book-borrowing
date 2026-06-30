@@ -47,3 +47,8 @@ export const STATUS = {
 }
 
 export const TOPICS = ['Fiction', 'Romance', 'Novel', 'Non-fiction', 'Thriller', 'Biography', 'Science', 'History', 'Other']
+
+export const TOPIC_LABELS = {
+  Fiction: 'פיקציה', Romance: 'רומן', Novel: 'רומן', 'Non-fiction': 'עיון',
+  Thriller: 'מתח', Biography: 'ביוגרפיה', Science: 'מדע', History: 'היסטוריה', Other: 'אחר',
+}

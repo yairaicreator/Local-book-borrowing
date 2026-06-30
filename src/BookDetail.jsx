@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import BookCover from './BookCover'
-import { STATUS, avatarPalette, initial } from './lib/utils'
+import { STATUS, TOPIC_LABELS, avatarPalette, initial } from './lib/utils'
 import { supabase } from './lib/supabase'
 
 export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdit }) {
@@ -22,32 +22,19 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
 
   let holderLabel, holderName
   if (book.status === 'borrowed') {
-    holderLabel = 'Currently borrowed by'
+    holderLabel = 'מושאל כרגע על ידי'
     holderName = book.borrowed_by_name || '—'
   } else if (book.status === 'unavailable') {
-    holderLabel = 'Kept by'
-    holderName = (book.Users?.name || 'Owner') + ' · not lending'
+    holderLabel = 'נמצא אצל'
+    holderName = (book.Users?.name || 'בעלים') + ' · לא להשאלה'
   } else {
-    holderLabel = 'On the shelf of'
-    holderName = book.Users?.name || 'Unknown'
+    holderLabel = 'על המדף של'
+    holderName = book.Users?.name || 'לא ידוע'
   }
 
-  let borrowBg, borrowInk, borrowLabel, borrowCursor, borrowAction
-  if (isOwnBook) {
-    borrowBg = '#F0ECE4'; borrowInk = '#A39B90'; borrowCursor = 'not-allowed'
-    borrowLabel = 'This is your book'; borrowAction = null
-  } else if (!isAvail) {
-    borrowBg = '#E9E3D8'; borrowInk = '#A39B90'; borrowCursor = 'not-allowed'
-    borrowLabel = book.status === 'borrowed' ? 'Currently Borrowed' : 'Not Available'
-    borrowAction = null
-  } else {
-    borrowBg = '#C05A3E'; borrowInk = '#F7F5F1'; borrowCursor = 'pointer'
-    borrowLabel = 'Request to Borrow'
-    borrowAction = () => setShowContact(true)
-  }
-
-  const ownerName = book.Users?.name || 'the owner'
-  const msgText = `Hi ${ownerName}! I'd love to borrow "${book.title}" from your Family Library shelf. Is it available? 📚`
+  const canBorrow = !isOwnBook && isAvail
+  const ownerName = book.Users?.name || 'הבעלים'
+  const msgText = `שלום ${ownerName}! אשמח לשאול את הספר "${book.title}" ממדף הספרייה המשפחתית שלך. האם הספר זמין? 📚`
   const ownerPhone = book.Users?.phone?.replace(/\D/g, '')
   const ownerEmail = book.Users?.email
 
@@ -56,13 +43,19 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
       { book_id: book.id, borrower_id: currentUser.id },
       { onConflict: 'book_id,borrower_id' }
     )
+    await supabase.from('Notifications').insert({
+      recipient_id: book.add_by,
+      sender_id: currentUser.id,
+      book_id: book.id,
+      message: `${currentUser.name || 'מישהו'} ביקש לשאול את "${book.title}"`,
+    })
     onBorrow(book)
   }
 
   function openWhatsApp() { window.open(`https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow() }
   function openSMS() { window.open(`sms:${ownerPhone}?body=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow() }
   function openEmail() {
-    window.open(`mailto:${ownerEmail}?subject=${encodeURIComponent(`Book borrow request: ${book.title}`)}&body=${encodeURIComponent(msgText)}`, '_blank')
+    window.open(`mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`, '_blank')
     recordBorrow()
   }
 
@@ -111,7 +104,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
         <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 24px 24px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22 }}>
             {showBack && book.back_image_url
-              ? <img src={book.back_image_url} alt="back cover" style={{ width: 176, height: 250, objectFit: 'cover', borderRadius: 10, boxShadow: '0 4px 16px -6px rgba(40,30,18,.35)' }} />
+              ? <img src={book.back_image_url} alt="עטיפה אחורית" style={{ width: 176, height: 250, objectFit: 'cover', borderRadius: 10, boxShadow: '0 4px 16px -6px rgba(40,30,18,.35)' }} />
               : <BookCover book={book} width={176} height={250} fontSize={23} authorSize={11} />
             }
             {book.back_image_url && (
@@ -121,7 +114,8 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          {/* status + topic + borrow button row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 13, fontWeight: 600, color: s.color, background: s.bg,
               padding: '5px 11px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -130,15 +124,25 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
             </span>
             {book.topic && (
               <span style={{ fontSize: 13, fontWeight: 600, color: '#8A6A3A', background: '#F3ECDD', padding: '5px 11px', borderRadius: 999 }}>
-                {book.topic}
+                {TOPIC_LABELS[book.topic] || book.topic}
               </span>
+            )}
+            {canBorrow && (
+              <button onClick={() => setShowContact(true)} style={{
+                marginRight: 'auto', border: 'none', borderRadius: 999, padding: '6px 16px',
+                background: '#C05A3E', color: '#F7F5F1', fontFamily: "'Source Sans 3',sans-serif",
+                fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+                בקש להשאיל
+              </button>
             )}
           </div>
 
           <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 27, lineHeight: 1.15, color: '#2C2622', margin: '0 0 5px' }}>
             {book.title}
           </h2>
-          <div style={{ fontSize: 16, color: '#7C756C', marginBottom: 18 }}>by {book.author}</div>
+          <div style={{ fontSize: 16, color: '#7C756C', marginBottom: 18 }}>מאת {book.author}</div>
 
           {book.description && (
             <p style={{ fontSize: 16, lineHeight: 1.6, color: '#4A443D', margin: '0 0 18px' }}>{book.description}</p>
@@ -175,14 +179,14 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
                 stroke={inReadingList ? '#C05A3E' : '#A39B90'} strokeWidth="2.2" strokeLinecap="round">
                 {inReadingList ? <path d="M5 13l4 4L19 7" /> : <path d="M12 5v14M5 12h14" />}
               </svg>
-              {inReadingList ? 'Saved to Reading List' : 'Add to Reading List'}
+              {inReadingList ? 'נשמר לרשימת הקריאה' : 'הוסף לרשימת הקריאה'}
             </button>
           )}
         </div>
 
-        <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
-          {isOwnBook && (
-            <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+        {isOwnBook && (
+          <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
+            <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1, fontSize: 13, color: '#A39B90', display: 'flex', alignItems: 'center' }}>
                 הוספת ספר זה — אחרים יכולים לשאול ממך.
               </div>
@@ -193,15 +197,8 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
                 </button>
               )}
             </div>
-          )}
-          <button onClick={borrowAction || undefined} disabled={!borrowAction} style={{
-            width: '100%', border: 'none', borderRadius: 16, padding: 17,
-            fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 17,
-            color: borrowInk, background: borrowBg, cursor: borrowCursor,
-          }}>
-            {borrowLabel}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {showContact && (
@@ -219,10 +216,10 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
           }}>
             <div style={{ width: 38, height: 5, borderRadius: 3, background: '#DDD6CA', margin: '0 auto 20px' }} />
             <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>
-              Contact {ownerName}
+              צור קשר עם {ownerName}
             </div>
             <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>
-              Choose how to send your borrow request:
+              בחר כיצד לשלוח את בקשת ההשאלה:
             </div>
 
             {ownerPhone ? (<>
@@ -230,15 +227,15 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
               <ContactBtn icon="📱" label="SMS" sub={book.Users?.phone} onClick={openSMS} color="#5A7FE0" />
             </>) : (
               <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
-                {ownerName} hasn't added a phone number.
+                {ownerName} לא הוסיף מספר טלפון.
               </div>
             )}
 
             {ownerEmail ? (
-              <ContactBtn icon="✉️" label="Email" sub={book.Users?.email} onClick={openEmail} color="#C05A3E" />
+              <ContactBtn icon="✉️" label="אימייל" sub={book.Users?.email} onClick={openEmail} color="#C05A3E" />
             ) : (
               <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
-                {ownerName} hasn't added an email address.
+                {ownerName} לא הוסיף כתובת אימייל.
               </div>
             )}
 
@@ -247,7 +244,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
               background: 'transparent', borderRadius: 14, padding: 14,
               fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16,
               color: '#6E675C', cursor: 'pointer',
-            }}>Cancel</button>
+            }}>ביטול</button>
           </div>
         </>
       )}

@@ -6,6 +6,7 @@ import BookDetail from './BookDetail'
 import AddBook from './AddBook'
 import Profile from './Profile'
 import Toast from './Toast'
+import NotificationBell from './NotificationBell'
 
 export default function Home({ currentUser }) {
   const [books, setBooks] = useState([])
@@ -93,16 +94,19 @@ export default function Home({ currentUser }) {
           </div>
           <div>
             <div style={{ fontSize: 12, letterSpacing: '.13em', textTransform: 'uppercase', color: '#A39B90', fontWeight: 600, lineHeight: 1, marginBottom: 3 }}>Family Library</div>
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622', letterSpacing: '-.01em', lineHeight: 1 }}>Hello, {firstName}</div>
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622', letterSpacing: '-.01em', lineHeight: 1 }}>שלום, {firstName}</div>
           </div>
-          <button onClick={() => setShowProfile(true)} style={{
-            marginLeft: 'auto', width: 40, height: 40, borderRadius: '50%',
-            background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 600, fontSize: 16, color: '#7A4A28', flex: 'none',
-            border: 'none', cursor: 'pointer',
-          }}>
-            {initial(currentUser.name)}
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <NotificationBell currentUser={currentUser} small />
+            <button onClick={() => setShowProfile(true)} style={{
+              width: 40, height: 40, borderRadius: '50%',
+              background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 600, fontSize: 16, color: '#7A4A28', flex: 'none',
+              border: 'none', cursor: 'pointer',
+            }}>
+              {initial(currentUser.name)}
+            </button>
+          </div>
         </div>
 
         {/* search */}
@@ -236,7 +240,7 @@ export default function Home({ currentUser }) {
         <BookDetail book={activeBook} currentUser={currentUser} onClose={() => setActiveBook(null)} onBorrow={handleBorrow} onEdit={b => { setActiveBook(null); setEditBook(b) }} />
       )}
       {showAdd && (
-        <AddBook currentUser={currentUser} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('Book saved to your shelf'); fetchBooks() }} />
+        <AddBook currentUser={currentUser} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('הספר נוסף למדף'); fetchBooks() }} />
       )}
       {editBook && (
         <AddBook currentUser={currentUser} bookToEdit={editBook} onClose={() => setEditBook(null)} onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }} />
