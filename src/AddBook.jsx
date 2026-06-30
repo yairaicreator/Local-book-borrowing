@@ -30,6 +30,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const frontRef = useRef()
   const backRef = useRef()
   const isbnRef = useRef()
+  const searchInputRef = useRef()
   const mobile = isMobileDevice()
 
   const [searchEmpty, setSearchEmpty] = useState(false)
@@ -74,7 +75,8 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
       }
       const book = await lookupISBN(isbn)
       if (!book) {
-        setIsbnNote(`Barcode read but not in database (local publisher code). Search by title below instead.`)
+        setIsbnNote(`Israeli barcode — not an international ISBN. Type the title in the search box below.`)
+        setTimeout(() => searchInputRef.current?.focus(), 100)
         return
       }
       applyBook(book)
@@ -246,7 +248,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
                   <DLabel>Search by title</DLabel>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 12, padding: '11px 13px' }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
-                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Type a title or author…" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 14, color: '#2C2622', flex: 1 }} />
+                    <input ref={searchInputRef} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Type a title or author…" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 14, color: '#2C2622', flex: 1 }} />
                     {searching && <div style={{ width: 14, height: 14, border: '2px solid #E7E1D6', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite', flexShrink: 0 }} />}
                     {searchQuery && !searching && <button onClick={() => { setSearchQuery(''); setSearchResults([]) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#A39B90', padding: 0, lineHeight: 1, fontSize: 17 }}>×</button>}
                   </div>
@@ -326,7 +328,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Or search by title</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, padding: '12px 14px' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Type a title or author…" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', flex: 1 }} />
+            <input ref={searchInputRef} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Type a title or author…" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', flex: 1 }} />
             {searching && <div style={{ width: 16, height: 16, border: '2px solid #E7E1D6', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite', flexShrink: 0 }} />}
             {searchQuery && !searching && <button onClick={() => { setSearchQuery(''); setSearchResults([]) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#A39B90', padding: 0, lineHeight: 1, fontSize: 18 }}>×</button>}
           </div>
