@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, analyzeBookCoverWithGemini, analyzeBackCoverWithGemini, detectTopic, scanISBN, lookupISBN, searchBooks } from './lib/scanner'
+import { analyzeBookCoverWithGemini, analyzeBackCoverWithGemini, searchBooks } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -16,9 +16,6 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [backPreview, setBackPreview] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [backScanning, setBackScanning] = useState(false)
-  const [isbnScanning, setIsbnScanning] = useState(false)
-  const [isbnNote, setIsbnNote] = useState('')
-  const [isbnSuccess, setIsbnSuccess] = useState(false)
   // title search
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -29,7 +26,6 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [error, setError] = useState('')
   const frontRef = useRef()
   const backRef = useRef()
-  const isbnRef = useRef()
   const searchInputRef = useRef()
   const mobile = isMobileDevice()
 
@@ -55,37 +51,8 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     if (book.author) setAuthor(book.author)
     if (book.description) setDescription(book.description)
     if (book.topic) setTopic(book.topic)
-    setIsbnSuccess(true)
-    setIsbnNote(`✓ Found: "${book.title}"`)
     setSearchQuery('')
     setSearchResults([])
-  }
-
-  async function handleISBNChange(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    setIsbnScanning(true)
-    setIsbnNote('')
-    setIsbnSuccess(false)
-    try {
-      const isbn = await scanISBN(file)
-      if (!isbn) {
-        setIsbnNote('לא נמצא ברקוד — נסה תמונה קרובה יותר של הברקוד, או חפש לפי כותרת.')
-        return
-      }
-      const book = await lookupISBN(isbn)
-      if (!book) {
-        setIsbnNote('ברקוד ישראלי — לא ISBN בינלאומי. חפש את הכותרת בתיבת החיפוש למטה.')
-        setTimeout(() => searchInputRef.current?.focus(), 100)
-        return
-      }
-      applyBook(book)
-    } catch (err) {
-      setIsbnNote(`Error: ${err.message}`)
-    } finally {
-      setIsbnScanning(false)
-      e.target.value = ''
-    }
   }
 
   async function handleFrontChange(e) {
@@ -188,27 +155,6 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
                 <input ref={frontRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFrontChange} />
                 <input ref={backRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBackChange} />
-                <input ref={isbnRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleISBNChange} />
-
-                {/* Auto fill (ISBN) */}
-                <div>
-                  <div style={photoLabel}>מילוי אוטומטי <span style={photoSub}>— סריקת ברקוד</span></div>
-                  <button onClick={() => { setIsbnNote(''); isbnRef.current.click() }} style={{ width: 150, border: `2px solid ${isbnSuccess ? '#2E8B57' : '#C05A3E'}`, background: isbnSuccess ? '#E2F1E7' : '#FDF0EC', borderRadius: 14, padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', justifyContent: 'center' }}>
-                    {isbnScanning ? (
-                      <>
-                        <div style={{ width: 22, height: 22, border: '2.5px solid #F1E3DE', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite' }} />
-                        <div style={{ fontSize: 12, color: '#C05A3E', fontWeight: 600 }}>סורק…</div>
-                      </>
-                    ) : (
-                      <>
-                        <BarcodeIcon color={isbnSuccess ? '#2E8B57' : '#C05A3E'} />
-                        <div style={{ fontSize: 13, fontWeight: 700, color: isbnSuccess ? '#2E8B57' : '#C05A3E' }}>מילוי אוטומטי</div>
-                        <div style={{ fontSize: 11, color: '#A39B90', textAlign: 'center' }}>תמונת ברקוד</div>
-                      </>
-                    )}
-                  </button>
-                  {isbnNote && <div style={{ fontSize: 12, color: isbnSuccess ? '#2E8B57' : '#8A6A3A', background: isbnSuccess ? '#E2F1E7' : '#F6EDD4', borderRadius: 8, padding: '7px 10px', marginTop: 8, width: 150, lineHeight: 1.4 }}>{isbnNote}</div>}
-                </div>
 
                 {/* front cover */}
                 <div>
@@ -267,7 +213,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
                   </div>
                   <SearchDropdown results={searchResults} empty={searchEmpty} onPick={applyBook} />
                 </div>
-                {(ocrNote || (isbnNote && !isbnSuccess)) && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>{ocrNote || isbnNote}</div>}
+                {ocrNote && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>{ocrNote}</div>}
                 <DLabel>כותרת</DLabel>
                 <input value={title} onChange={e => setTitle(e.target.value)} placeholder="שם הספר" dir="rtl" style={dinputStyle} onFocus={f} onBlur={b} />
                 <DLabel>מחבר</DLabel>
@@ -315,26 +261,6 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         {/* hidden inputs — capture="environment" on mobile opens camera directly */}
         <input ref={frontRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleFrontChange} />
         <input ref={backRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleBackChange} />
-        <input ref={isbnRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleISBNChange} />
-
-        {/* Auto fill (ISBN) — primary action */}
-        <button onClick={() => { setIsbnNote(''); isbnRef.current.click() }} style={{ width: '100%', border: `2px solid ${isbnSuccess ? '#2E8B57' : '#C05A3E'}`, background: isbnSuccess ? '#E2F1E7' : '#FDF0EC', borderRadius: 18, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', marginBottom: 10 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 14, background: isbnSuccess ? '#C4E4D0' : '#F1E0D8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            {isbnScanning
-              ? <div style={{ width: 22, height: 22, border: '2.5px solid rgba(192,90,62,.25)', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite' }} />
-              : <BarcodeIcon color={isbnSuccess ? '#2E8B57' : '#C05A3E'} size={26} />
-            }
-          </div>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: isbnSuccess ? '#2E8B57' : '#C05A3E' }}>
-              {isbnScanning ? 'סורק ברקוד…' : isbnSuccess ? 'מולא אוטומטית!' : 'מילוי אוטומטי'}
-            </div>
-            <div style={{ fontSize: 13, color: '#7C756C', marginTop: 2 }}>
-              {isbnSuccess ? isbnNote : 'תמונה קרובה של הברקוד'}
-            </div>
-          </div>
-        </button>
-        {isbnNote && !isbnSuccess && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 12, padding: '11px 14px', marginBottom: 10 }}>{isbnNote}</div>}
 
         {/* Title search */}
         <div style={{ position: 'relative', marginBottom: 18 }}>

@@ -286,7 +286,8 @@ export async function analyzeBackCoverWithGemini(file) {
 
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-    const description = raw.match(/DESCRIPTION:\s*(.+)/i)?.[1]?.trim() || ''
+    // Capture everything between DESCRIPTION: and TOPIC: (description can span multiple lines)
+    const description = raw.match(/DESCRIPTION:\s*([\s\S]*?)(?=\nTOPIC:|$)/i)?.[1]?.trim() || ''
     const topicRaw = raw.match(/TOPIC:\s*(.+)/i)?.[1]?.trim() || ''
     const topic = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other'].includes(topicRaw) ? topicRaw : null
     return { description, topic }
