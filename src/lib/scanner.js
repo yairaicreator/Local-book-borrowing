@@ -180,7 +180,14 @@ export async function scanImageText(file) {
 // Try models in order until one responds successfully.
 // 404 = model not available in this API version → try next.
 // 429 = quota exceeded → stop immediately (switching model won't help for minute-limit).
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+const GEMINI_MODELS = [
+  'gemini-3.5-flash',   // Gemini 3.5 Flash (latest per docs)
+  'gemini-3.0-flash',   // Gemini 3 Flash (user requested)
+  'gemini-3-flash',     // alternate API naming
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',   // confirmed to exist (gave 429, not 404)
+  'gemini-1.5-flash',
+]
 
 const GEMINI_PROMPT = 'This is a book cover. The title is usually the largest text. The author name is usually smaller text below. Text may be in Hebrew (right-to-left). Ignore taglines, subtitles, prizes ("Nobel Prize"), publisher names. Return ONLY valid JSON, no markdown: {"title": "...", "author": "..."}'
 
@@ -193,14 +200,16 @@ export async function analyzeBookCoverWithGemini(file) {
   })
 
   let lastErr = 'no models tried'
-  for (const model of GEMINI_MODELS) {
+  let retried = false
+  for (let i = 0; i < GEMINI_MODELS.length; i++) {
+    const model = GEMINI_MODELS[i]
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
     )
     if (res.status === 429) {
-      const b = await res.text()
-      throw new Error(`Gemini 429 (quota): ${b.slice(0, 120)}`)
+      if (!retried) { retried = true; await new Promise(r => setTimeout(r, 3000)); i--; continue }
+      throw new Error('Gemini 429: rate limit — wait a minute and try again')
     }
     if (res.status === 404) { lastErr = `${model} not found`; continue }
     if (!res.ok) { lastErr = `${model} ${res.status}`; continue }
