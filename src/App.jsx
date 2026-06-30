@@ -70,7 +70,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
       <div style={{ position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh', background: '#F5F0E6', overflow: 'hidden' }}>
-        <Home currentUser={user} />
+        <Home currentUser={user} onUserUpdate={setUser} />
       </div>
     </div>
   )

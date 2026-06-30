@@ -26,6 +26,8 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [ocrNote, setOcrNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showDupConfirm, setShowDupConfirm] = useState(false)
+  const dupConfirmedRef = useRef(false)
   const frontRef = useRef()
   const backRef = useRef()
   const searchInputRef = useRef()
@@ -65,12 +67,22 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setOcrNote('')
     setScanning(true)
     try {
-      const { title: t, author: a } = await analyzeBookCoverWithGemini(file)
-      if (t && !title) setTitle(t)
-      if (a && !author) setAuthor(a)
-      setOcrNote(`✓ זוהה על ידי AI: "${t}"`)
+      const { title: t, author: a, handwritten } = await analyzeBookCoverWithGemini(file)
+      if (t) {
+        if (!title) setTitle(t)
+        if (a && !author) setAuthor(a)
+        if (handwritten) {
+          setOcrNote(`✓ זוהה כתב יד: "${t}" — אנא בדוק שהכותרת נכונה.`)
+        } else {
+          setOcrNote(`✓ זוהה על ידי AI: "${t}"`)
+        }
+      } else if (handwritten) {
+        setOcrNote('הכותרת נראית כתובה ביד ולא ניתן לקרוא אותה — אנא הקלד את הכותרת והמחבר ידנית.')
+      } else {
+        setOcrNote('לא הצלחנו לזהות את הספר — חפש כותרת בתיבת החיפוש למטה.')
+      }
     } catch (err) {
-      setOcrNote(`לא הצלחנו לזהות את הספר — חפש כותרת בתיבת החיפוש למטה.`)
+      setOcrNote('לא הצלחנו לזהות את הספר — חפש כותרת בתיבת החיפוש למטה.')
     } finally { setScanning(false) }
   }
 
@@ -90,12 +102,23 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         setOcrNote(`AI לא מצא תיאור. תגובה: "${raw?.slice(0, 100)}"`)
       }
     } catch (err) {
-      setOcrNote(`סריקת עטיפה אחורית נכשלה: ${err.message}`)
+      const msg = err.message?.includes('מגבלת קצב') || err.message?.includes('rate')
+        ? 'שגיאת מגבלת קצב — המתן כמה שניות ונסה לצלם שנית.'
+        : 'לא הצלחנו לקרוא את העטיפה האחורית — נסה שנית.'
+      setOcrNote(msg)
     } finally { setBackScanning(false) }
   }
 
   async function handleSave() {
     if (!title.trim() || !author.trim() || saving) return
+    // Duplicate check (only when adding, not editing)
+    if (!editing && !dupConfirmedRef.current) {
+      const { data: existing } = await supabase.from('Books')
+        .select('id, title').eq('add_by', currentUser.id)
+      const dup = existing?.find(b => b.title.trim().toLowerCase() === title.trim().toLowerCase())
+      if (dup) { setShowDupConfirm(true); return }
+    }
+    dupConfirmedRef.current = false
     setSaving(true)
     setError('')
     try {
@@ -346,6 +369,23 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           {saving ? 'שומר…' : editing ? 'שמור שינויים' : 'שמור ספר'}
         </button>
       </div>
+
+      {showDupConfirm && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(40,30,18,.55)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+          <div style={{ background: '#F7F5F1', borderRadius: 22, padding: '28px 24px', width: '100%', maxWidth: 360, boxShadow: '0 24px 56px -18px rgba(40,30,18,.55)', animation: 'flPop .26s cubic-bezier(.22,1,.36,1)' }}>
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 10 }}>ספר כבר קיים</div>
+            <div style={{ fontSize: 15, color: '#4A443D', lineHeight: 1.55, marginBottom: 22 }}>
+              כבר הוספת ספר בשם <strong>"{title}"</strong> למדף שלך. האם ברצונך להוסיף עותק נוסף?
+            </div>
+            <button onClick={() => { dupConfirmedRef.current = true; setShowDupConfirm(false); handleSave() }} style={{ width: '100%', border: 'none', borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', marginBottom: 10 }}>
+              כן, הוסף עותק נוסף
+            </button>
+            <button onClick={() => { setShowDupConfirm(false); setTitle(''); setAuthor(''); setDescription(''); setImagePreview(null); setImageFile(null); setSearchQuery('') }} style={{ width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#6E675C', cursor: 'pointer' }}>
+              לא, הוסף ספר אחר
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

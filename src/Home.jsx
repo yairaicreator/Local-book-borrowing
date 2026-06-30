@@ -8,7 +8,8 @@ import Profile from './Profile'
 import Toast from './Toast'
 import NotificationBell from './NotificationBell'
 
-export default function Home({ currentUser }) {
+export default function Home({ currentUser: initialUser, onUserUpdate }) {
+  const [currentUser, setCurrentUser] = useState(initialUser)
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -246,7 +247,9 @@ export default function Home({ currentUser }) {
         <AddBook currentUser={currentUser} bookToEdit={editBook} onClose={() => setEditBook(null)} onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }} />
       )}
       {showProfile && (
-        <Profile currentUser={currentUser} onClose={() => setShowProfile(false)} />
+        <Profile currentUser={currentUser} onClose={() => setShowProfile(false)}
+          onEdit={b => { setShowProfile(false); setEditBook(b) }}
+          onUserUpdate={u => { setCurrentUser(u); onUserUpdate?.(u) }} />
       )}
       <Toast message={toast} />
     </div>

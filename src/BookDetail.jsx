@@ -59,10 +59,17 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
     setTimeout(() => { setShowContact(false); setNotifSent(false) }, 1400)
   }
 
-  function openWhatsApp() { window.open(`https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow(); setShowContact(false) }
-  function openSMS() { window.open(`sms:${ownerPhone}?body=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow(); setShowContact(false) }
+  function openWhatsApp() {
+    // Use location.href for deep links — window.open is blocked by iOS after async calls
+    window.location.href = `https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`
+    recordBorrow(); setShowContact(false)
+  }
+  function openSMS() {
+    window.location.href = `sms:${ownerPhone}&body=${encodeURIComponent(msgText)}`
+    recordBorrow(); setShowContact(false)
+  }
   function openEmail() {
-    window.open(`mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`, '_blank')
+    window.location.href = `mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`
     recordBorrow(); setShowContact(false)
   }
 

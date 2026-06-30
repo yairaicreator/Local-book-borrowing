@@ -188,9 +188,10 @@ const GEMINI_MODELS = [
 const GEMINI_PROMPT = `You are looking at a book cover photo.
 Your only job: output the book title and author name.
 
-Output format — two lines, nothing else:
+Output format — exactly two or three lines, nothing else:
 TITLE: <the book title>
 AUTHOR: <the author name>
+HANDWRITTEN: yes   ← add this third line ONLY if the title text is handwritten (pen/pencil), not if it is a printed or designed font
 
 Rules:
 - Title = the largest or most prominent text on the cover
@@ -198,24 +199,25 @@ Rules:
 - The text may be in Hebrew or English — copy it exactly as written
 - Do NOT describe the image, do NOT add commentary, do NOT say "upside down" or anything else
 - If you cannot find the author, write AUTHOR: unknown
-- Output ONLY the two lines above, no other text`
+- If the title IS handwritten but you can still read it, still output the title AND add HANDWRITTEN: yes
+- If the title is handwritten and you CANNOT read it, write TITLE: unknown and add HANDWRITTEN: yes
+- Output ONLY the lines above, no other text`
 
 function parseGeminiResponse(raw) {
-  // Match TITLE:/AUTHOR: anywhere in the response (Gemini sometimes adds preamble commentary)
   let title = raw.match(/TITLE:\s*(.+)/i)?.[1]?.trim() || ''
   let author = raw.match(/AUTHOR:\s*(.+)/i)?.[1]?.trim() || ''
+  const handwritten = /HANDWRITTEN:\s*yes/i.test(raw)
 
-  // Hebrew labels fallback
   if (!title) title = raw.match(/כותרת[:\s]+(.+)/)?.[1]?.trim() || ''
   if (!author) author = raw.match(/(?:מחבר|סופר|מחברת)[:\s]+(.+)/)?.[1]?.trim() || ''
 
-  // Strip stray quotes
   title = title.replace(/^["'"״]|["'"״]$/g, '').trim()
   author = author.replace(/^["'"״]|["'"״]$/g, '').trim()
   if (author.toLowerCase() === 'unknown') author = ''
+  if (title.toLowerCase() === 'unknown') title = ''
 
-  if (!title) throw new Error(`Gemini format unknown: "${raw.slice(0, 120)}"`)
-  return { title, author }
+  if (!title && !handwritten) throw new Error(`Gemini format unknown: "${raw.slice(0, 120)}"`)
+  return { title, author, handwritten }
 }
 
 export async function analyzeBookCoverWithGemini(file) {
@@ -267,11 +269,11 @@ export async function analyzeBackCoverWithGemini(file) {
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_BACK_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 800 },
+    generationConfig: { temperature: 0, maxOutputTokens: 1200 },
   })
 
   let lastErr = 'no models tried'
-  let retried = false
+  let retryCount = 0
   for (let i = 0; i < GEMINI_MODELS.length; i++) {
     const model = GEMINI_MODELS[i]
     const res = await fetch(
@@ -279,23 +281,26 @@ export async function analyzeBackCoverWithGemini(file) {
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
     )
     if (res.status === 429) {
-      if (!retried) { retried = true; await new Promise(r => setTimeout(r, 3000)); i--; continue }
-      throw new Error('rate limit')
+      if (retryCount < 3) {
+        retryCount++
+        await new Promise(r => setTimeout(r, retryCount * 4000))
+        i-- // retry same model
+        continue
+      }
+      throw new Error('מגבלת קצב של Gemini — המתן מספר שניות ונסה שנית')
     }
+    retryCount = 0
     if (res.status === 404) { lastErr = `${model} not found`; continue }
     if (!res.ok) { lastErr = `${model} ${res.status}`; continue }
 
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
 
-    // Extract topic from last TOPIC: line
     const topicRaw = (raw.match(/TOPIC:\s*(.+)/i)?.[1] || '').trim()
     const topic = TOPICS_LIST.includes(topicRaw) ? topicRaw : null
 
-    // Description = everything before the TOPIC: line, stripped of any quoted wrappers
     let description = raw.replace(/\nTOPIC:.+/i, '').trim()
 
-    // If Gemini still added commentary, pull out all quoted Hebrew/English text and join it
     if (/^[A-Za-z]/.test(description) && description.includes('"')) {
       const quoted = [...description.matchAll(/"([^"]{10,})"/g)].map(m => m[1])
       if (quoted.length) description = quoted.join(' ')
@@ -303,7 +308,7 @@ export async function analyzeBackCoverWithGemini(file) {
 
     return { description, topic, raw }
   }
-  throw new Error(`Gemini unavailable: ${lastErr}`)
+  throw new Error(`Gemini לא זמין: ${lastErr}`)
 }
 
 // ─── Option B: Auto-search from OCR text ─────────────────────────────────────
