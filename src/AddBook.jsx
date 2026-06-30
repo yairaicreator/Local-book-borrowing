@@ -32,16 +32,20 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const isbnRef = useRef()
   const mobile = isMobileDevice()
 
+  const [searchEmpty, setSearchEmpty] = useState(false)
+
   // Debounced title search
   useEffect(() => {
     clearTimeout(searchTimer.current)
-    if (!searchQuery.trim()) { setSearchResults([]); return }
+    if (!searchQuery.trim()) { setSearchResults([]); setSearchEmpty(false); return }
     setSearching(true)
+    setSearchEmpty(false)
     searchTimer.current = setTimeout(async () => {
       const results = await searchBooks(searchQuery)
       setSearchResults(results)
+      setSearchEmpty(results.length === 0)
       setSearching(false)
-    }, 500)
+    }, 600)
     return () => clearTimeout(searchTimer.current)
   }, [searchQuery])
 
@@ -246,18 +250,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
                     {searching && <div style={{ width: 14, height: 14, border: '2px solid #E7E1D6', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite', flexShrink: 0 }} />}
                     {searchQuery && !searching && <button onClick={() => { setSearchQuery(''); setSearchResults([]) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#A39B90', padding: 0, lineHeight: 1, fontSize: 17 }}>×</button>}
                   </div>
-                  {searchResults.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 12, overflow: 'hidden', zIndex: 50, boxShadow: '0 8px 24px -8px rgba(44,38,34,.2)', marginTop: 4 }}>
-                      {searchResults.map((r, i) => (
-                        <button key={i} onClick={() => applyBook(r)} style={{ width: '100%', border: 'none', background: 'none', padding: '11px 14px', textAlign: 'left', cursor: 'pointer', borderBottom: i < searchResults.length - 1 ? '1px solid #F0ECE4' : 'none', display: 'block' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#F7F5F1'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#2C2622', lineHeight: 1.3 }}>{r.title}</div>
-                          {r.author && <div style={{ fontSize: 12, color: '#7C756C', marginTop: 2 }}>{r.author}</div>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <SearchDropdown results={searchResults} empty={searchEmpty} onPick={applyBook} />
                 </div>
                 {(ocrNote || (isbnNote && !isbnSuccess)) && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 10, padding: '10px 13px', marginBottom: 14 }}>{ocrNote || isbnNote}</div>}
                 <DLabel>Title</DLabel>
@@ -337,18 +330,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
             {searching && <div style={{ width: 16, height: 16, border: '2px solid #E7E1D6', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite', flexShrink: 0 }} />}
             {searchQuery && !searching && <button onClick={() => { setSearchQuery(''); setSearchResults([]) }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#A39B90', padding: 0, lineHeight: 1, fontSize: 18 }}>×</button>}
           </div>
-          {searchResults.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, overflow: 'hidden', zIndex: 10, boxShadow: '0 8px 24px -8px rgba(44,38,34,.2)', marginTop: 4 }}>
-              {searchResults.map((r, i) => (
-                <button key={i} onClick={() => applyBook(r)} style={{ width: '100%', border: 'none', background: 'none', padding: '12px 16px', textAlign: 'left', cursor: 'pointer', borderBottom: i < searchResults.length - 1 ? '1px solid #F0ECE4' : 'none', display: 'block' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#F7F5F1'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', lineHeight: 1.3 }}>{r.title}</div>
-                  {r.author && <div style={{ fontSize: 13, color: '#7C756C', marginTop: 2 }}>{r.author}</div>}
-                </button>
-              ))}
-            </div>
-          )}
+          <SearchDropdown results={searchResults} empty={searchEmpty} onPick={applyBook} />
         </div>
 
         {/* front cover */}
@@ -452,6 +434,25 @@ function PhotoIcon() {
   return (
     <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+    </div>
+  )
+}
+
+function SearchDropdown({ results, empty, onPick }) {
+  if (!results.length && !empty) return null
+  return (
+    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, overflow: 'hidden', zIndex: 50, boxShadow: '0 8px 24px -8px rgba(44,38,34,.2)', marginTop: 4 }}>
+      {empty
+        ? <div style={{ padding: '13px 16px', fontSize: 13, color: '#A39B90' }}>No results — try different keywords or the English title if this is a translated book.</div>
+        : results.map((r, i) => (
+          <button key={i} onClick={() => onPick(r)} style={{ width: '100%', border: 'none', background: 'none', padding: '12px 16px', textAlign: 'left', cursor: 'pointer', borderBottom: i < results.length - 1 ? '1px solid #F0ECE4' : 'none', display: 'block' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#F7F5F1'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', lineHeight: 1.3 }}>{r.title}</div>
+            {r.author && <div style={{ fontSize: 13, color: '#7C756C', marginTop: 2 }}>{r.author}</div>}
+          </button>
+        ))
+      }
     </div>
   )
 }

@@ -56,20 +56,40 @@ export async function lookupISBN(isbn) {
   }
 }
 
-// Search Google Books by free-text query (title, author, or both).
-// Returns up to 5 result objects.
+// Search by title/author. Tries Google Books first, falls back to Open Library.
 export async function searchBooks(query) {
   if (!query.trim()) return []
+
+  // 1. Google Books (with API key for higher quota)
   try {
     const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5`
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${VISION_KEY}`
     )
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data.items || []).map(item => bookInfoToResult(item.volumeInfo))
-  } catch {
-    return []
-  }
+    if (res.ok) {
+      const data = await res.json()
+      const results = (data.items || []).map(item => bookInfoToResult(item.volumeInfo))
+      if (results.length > 0) return results
+    }
+  } catch { /* fall through */ }
+
+  // 2. Open Library fallback (no key, good for non-English books)
+  try {
+    const res = await fetch(
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&fields=title,author_name,first_sentence,subject&limit=5`
+    )
+    if (res.ok) {
+      const data = await res.json()
+      return (data.docs || []).map(doc => ({
+        title: doc.title || '',
+        author: (doc.author_name || []).join(', '),
+        description: doc.first_sentence?.value || doc.first_sentence || '',
+        topic: mapCategory(doc.subject),
+        coverUrl: null,
+      }))
+    }
+  } catch { /* silent */ }
+
+  return []
 }
 
 function bookInfoToResult(info) {
