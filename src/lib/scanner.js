@@ -55,41 +55,59 @@ export async function scanImageText(file) {
   return { text, words }
 }
 
-// Uses font size (bounding box height) to identify title and author.
-// Title = largest text on cover (≥80% of max height).
-// Author = next size tier (40–79% of max height), first visual line only.
-// This ignores publisher names, editor credits, subtitles etc. which are smaller.
+// Groups words into natural font-size clusters by finding gaps in the height distribution.
+// A gap of >20% relative to the larger height = a new prominence level.
+// Cluster 0 = title (biggest), cluster 1 = author (second biggest), rest ignored.
 export function extractTitleAuthor(words) {
   if (!words?.length) return { title: '', author: '' }
 
-  const maxH = Math.max(...words.map(w => w.h))
+  const clusters = clusterByHeight(words)
 
-  const titleWords = words.filter(w => w.h >= maxH * 0.8)
-  const authorWords = words.filter(w => w.h >= maxH * 0.4 && w.h < maxH * 0.8)
+  const titleWords = clusters[0] || []
+  const authorWords = clusters[1] || []
 
   const title = linesToText(groupByLines(titleWords))
-  // Only take the first visual line of author-sized words
+  // Only the first visual line of author-cluster words (avoids subtitles below the name)
   const authorLines = groupByLines(authorWords)
-  const author = authorLines.length ? authorLines[0].words.map(w => w.text).join(' ') : ''
+  const author = authorLines.length
+    ? authorLines[0].words.map(w => w.text).join(' ')
+    : ''
 
   return { title, author }
 }
 
-// Group words into visual lines sorted top-to-bottom.
-// Within each line words are sorted right-to-left (correct for Hebrew and safe for LTR).
+// Sort words into descending-height buckets separated by >20% gaps.
+function clusterByHeight(words) {
+  const sorted = [...words].sort((a, b) => b.h - a.h)
+  const clusters = [[sorted[0]]]
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1].h
+    const curr = sorted[i].h
+    if (prev > 0 && (prev - curr) / prev > 0.20) {
+      clusters.push([])
+    }
+    clusters[clusters.length - 1].push(sorted[i])
+  }
+  return clusters
+}
+
+// Group words into visual lines (top-to-bottom). Within each line sort right-to-left
+// so Hebrew text reads correctly (and is harmless for LTR languages).
 function groupByLines(words) {
+  if (!words.length) return []
   const sorted = [...words].sort((a, b) => a.y - b.y)
+  const avgH = words.reduce((s, w) => s + w.h, 0) / words.length
+  const lineThreshold = avgH * 0.6
+
   const lines = []
   sorted.forEach(w => {
     const last = lines[lines.length - 1]
-    // Two words are on the same line if y difference < half the max word height
-    if (last && w.y - last.baseY < Math.max(...words.map(w => w.h)) * 0.5) {
+    if (last && w.y - last.baseY < lineThreshold) {
       last.words.push(w)
     } else {
       lines.push({ baseY: w.y, words: [w] })
     }
   })
-  // Sort each line right-to-left (works for Hebrew; harmless for LTR)
   lines.forEach(l => l.words.sort((a, b) => b.x - a.x))
   return lines
 }
