@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, extractTitleAuthor, detectTopic } from './lib/scanner'
+import { scanImageText, extractTitleAuthor, detectTopic, scanISBN, lookupISBN } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -16,12 +16,48 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [backPreview, setBackPreview] = useState(null)
   const [scanning, setScanning] = useState(false)
   const [backScanning, setBackScanning] = useState(false)
-  const [ocrNote, setOcrNote] = useState('')  // shown when OCR result is unusable
+  const [isbnScanning, setIsbnScanning] = useState(false)
+  const [isbnNote, setIsbnNote] = useState('')   // success or error feedback
+  const [isbnSuccess, setIsbnSuccess] = useState(false)
+  const [ocrNote, setOcrNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const frontRef = useRef()
   const backRef = useRef()
+  const isbnRef = useRef()
   const mobile = isMobileDevice()
+
+  async function handleISBNChange(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setIsbnScanning(true)
+    setIsbnNote('')
+    setIsbnSuccess(false)
+    try {
+      const isbn = await scanISBN(file)
+      if (!isbn) {
+        setIsbnNote("No barcode found — make sure the ISBN barcode is visible and well-lit.")
+        return
+      }
+      const book = await lookupISBN(isbn)
+      if (!book) {
+        setIsbnNote(`Barcode read (${isbn}) but not found in database — please type manually.`)
+        return
+      }
+      if (book.title) setTitle(book.title)
+      if (book.author) setAuthor(book.author)
+      if (book.description) setDescription(book.description)
+      if (book.topic) setTopic(book.topic)
+      setIsbnSuccess(true)
+      setIsbnNote(`✓ Found: "${book.title}"`)
+    } catch (err) {
+      setIsbnNote(`Error: ${err.message}`)
+    } finally {
+      setIsbnScanning(false)
+      // reset so the same file can be re-selected
+      e.target.value = ''
+    }
+  }
 
   async function handleFrontChange(e) {
     const file = e.target.files[0]
@@ -110,6 +146,27 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
                 <input ref={frontRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFrontChange} />
                 <input ref={backRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBackChange} />
+                <input ref={isbnRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleISBNChange} />
+
+                {/* Auto fill (ISBN) */}
+                <div>
+                  <div style={photoLabel}>Auto fill <span style={photoSub}>— scan barcode</span></div>
+                  <button onClick={() => { setIsbnNote(''); isbnRef.current.click() }} style={{ width: 150, border: `2px solid ${isbnSuccess ? '#2E8B57' : '#C05A3E'}`, background: isbnSuccess ? '#E2F1E7' : '#FDF0EC', borderRadius: 14, padding: '14px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, cursor: 'pointer', justifyContent: 'center' }}>
+                    {isbnScanning ? (
+                      <>
+                        <div style={{ width: 22, height: 22, border: '2.5px solid #F1E3DE', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite' }} />
+                        <div style={{ fontSize: 12, color: '#C05A3E', fontWeight: 600 }}>Scanning…</div>
+                      </>
+                    ) : (
+                      <>
+                        <BarcodeIcon color={isbnSuccess ? '#2E8B57' : '#C05A3E'} />
+                        <div style={{ fontSize: 13, fontWeight: 700, color: isbnSuccess ? '#2E8B57' : '#C05A3E' }}>Auto fill</div>
+                        <div style={{ fontSize: 11, color: '#A39B90', textAlign: 'center' }}>Photo of barcode</div>
+                      </>
+                    )}
+                  </button>
+                  {isbnNote && <div style={{ fontSize: 12, color: isbnSuccess ? '#2E8B57' : '#8A6A3A', background: isbnSuccess ? '#E2F1E7' : '#F6EDD4', borderRadius: 8, padding: '7px 10px', marginTop: 8, width: 150, lineHeight: 1.4 }}>{isbnNote}</div>}
+                </div>
 
                 {/* front cover */}
                 <div>
@@ -205,6 +262,26 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         {/* hidden inputs — capture="environment" on mobile opens camera directly */}
         <input ref={frontRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleFrontChange} />
         <input ref={backRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleBackChange} />
+        <input ref={isbnRef} type="file" accept="image/*" capture={mobile ? 'environment' : undefined} style={{ display: 'none' }} onChange={handleISBNChange} />
+
+        {/* Auto fill (ISBN) — primary action */}
+        <button onClick={() => { setIsbnNote(''); isbnRef.current.click() }} style={{ width: '100%', border: `2px solid ${isbnSuccess ? '#2E8B57' : '#C05A3E'}`, background: isbnSuccess ? '#E2F1E7' : '#FDF0EC', borderRadius: 18, padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', marginBottom: 10 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 14, background: isbnSuccess ? '#C4E4D0' : '#F1E0D8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {isbnScanning
+              ? <div style={{ width: 22, height: 22, border: '2.5px solid rgba(192,90,62,.25)', borderTopColor: '#C05A3E', borderRadius: '50%', animation: 'fl-spin 0.7s linear infinite' }} />
+              : <BarcodeIcon color={isbnSuccess ? '#2E8B57' : '#C05A3E'} size={26} />
+            }
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: isbnSuccess ? '#2E8B57' : '#C05A3E' }}>
+              {isbnScanning ? 'Scanning barcode…' : isbnSuccess ? 'Auto filled!' : 'Auto fill'}
+            </div>
+            <div style={{ fontSize: 13, color: '#7C756C', marginTop: 2 }}>
+              {isbnSuccess ? isbnNote : 'Take a photo of the barcode on the back cover'}
+            </div>
+          </div>
+        </button>
+        {isbnNote && !isbnSuccess && <div style={{ fontSize: 13, color: '#8A6A3A', background: '#F6EDD4', borderRadius: 12, padding: '11px 14px', marginBottom: 10 }}>{isbnNote}</div>}
 
         {/* front cover */}
         <div style={{ fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Front cover — AI reads title &amp; author</div>
@@ -308,6 +385,15 @@ function PhotoIcon() {
     <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
     </div>
+  )
+}
+
+function BarcodeIcon({ color = '#C05A3E', size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14" strokeWidth="1.5" />
+      <path d="M1 3h4M1 21h4M19 3h4M19 21h4" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   )
 }
 
