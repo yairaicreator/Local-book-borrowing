@@ -1,8 +1,8 @@
 import { BrowserMultiFormatReader } from '@zxing/browser'
 
-const VISION_KEY = import.meta.env.VITE_VISION_KEY
-const BOOKS_KEY = import.meta.env.VITE_BOOKS_KEY
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_KEY
+const VISION_KEY = import.meta.env.VITE_VISION_KEY_1
+const BOOKS_KEY = import.meta.env.VITE_BOOKS_SEARCH
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_AI
 
 // ─── ISBN ────────────────────────────────────────────────────────────────────
 
