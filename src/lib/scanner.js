@@ -1,7 +1,8 @@
 import { BrowserMultiFormatReader } from '@zxing/browser'
 
-const VISION_KEY = 'AIzaSyDC9s4Ge7V5XhygYjvEErv7Y-4BnnF0SZc'
-const BOOKS_KEY = 'AIzaSyC61fCfD-7HHYKBN0T8oX25TjIfWQrxORI'
+const VISION_KEY = import.meta.env.VITE_VISION_KEY
+const BOOKS_KEY = import.meta.env.VITE_BOOKS_KEY
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_KEY
 
 // ─── ISBN ────────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,48 @@ export async function scanImageText(file) {
   return { text, words }
 }
 
+// ─── Option A: Gemini Vision ─────────────────────────────────────────────────
+// Send the image directly to Gemini and ask it to identify title + author.
+// Gemini understands visual layout so it knows big text = title, smaller = author.
+// Throws on any failure so the caller can fall through to Option B.
+export async function analyzeBookCoverWithGemini(file) {
+  const base64 = await fileToBase64(file)
+  const mimeType = file.type || 'image/jpeg'
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inlineData: { mimeType, data: base64 } },
+            { text: 'This is a book cover. The title is usually the largest text. The author name is usually smaller text. Text may be in Hebrew (right-to-left). Ignore subtitles, taglines (like "Nobel Prize winner"), publisher names, and series info. Return ONLY valid JSON with no markdown formatting: {"title": "...", "author": ""}' }
+          ]
+        }],
+        generationConfig: { temperature: 0, maxOutputTokens: 200 }
+      })
+    }
+  )
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Gemini ${res.status}: ${body.slice(0, 120)}`)
+  }
+
+  const data = await res.json()
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+
+  // Strip markdown code fences if Gemini wraps the JSON
+  const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  const result = JSON.parse(jsonStr) // throws if malformed
+
+  if (!result.title && !result.author) throw new Error('Gemini returned empty title and author')
+  return { title: result.title || '', author: result.author || '' }
+}
+
+// ─── Option B: Auto-search from OCR text ─────────────────────────────────────
 // Smart OCR: search Google Books + Open Library with the full cover text.
 // If a book is found whose title words appear in the OCR, return full book info.
 // Otherwise fall back to bounding-box heuristic.

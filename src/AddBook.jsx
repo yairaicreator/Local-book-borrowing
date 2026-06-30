@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, extractBookFromOCR, detectTopic, scanISBN, lookupISBN, searchBooks } from './lib/scanner'
+import { scanImageText, analyzeBookCoverWithGemini, detectTopic, scanISBN, lookupISBN, searchBooks } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -96,20 +96,30 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setOcrNote('')
     setScanning(true)
     try {
-      const { text, words } = await scanImageText(file)
-      if (!text.trim() && words.length === 0) {
-        setOcrNote('לא נמצא טקסט בעטיפה — אנא הקלד ידנית.')
+      // Run Vision OCR and Gemini in parallel — both start immediately
+      const [ocrResult, geminiResult] = await Promise.allSettled([
+        scanImageText(file),
+        analyzeBookCoverWithGemini(file),
+      ])
+
+      // ── Option A: Gemini ──────────────────────────────────────────────────
+      if (geminiResult.status === 'fulfilled') {
+        const { title: t, author: a } = geminiResult.value
+        if (t && !title) setTitle(t)
+        if (a && !author) setAuthor(a)
+        setOcrNote(`✓ זוהה על ידי AI: "${t}"`)
         return
       }
-      const book = await extractBookFromOCR(text, words)
-      if (book.title && !title) setTitle(book.title)
-      if (book.author && !author) setAuthor(book.author)
-      if (book.description && !description) setDescription(book.description)
-      if (book.topic) setTopic(book.topic)
-      if (book.fromDatabase) {
-        setOcrNote(`✓ נמצא: "${book.title}"`)
-      } else if (!book.title) {
-        setOcrNote('לא ניתן לזהות את הספר — אנא הקלד ידנית.')
+
+      // ── Option B: auto-fill search from OCR text (Gemini failed) ─────────
+      const ocrText = ocrResult.status === 'fulfilled' ? ocrResult.value.text : ''
+      if (ocrText.trim()) {
+        const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 1)
+        const query = lines.slice(0, 4).join(' ')
+        setSearchQuery(query)   // triggers the debounced search automatically
+        setOcrNote('AI לא הצליח לזהות — תוצאות חיפוש הוצגו למטה, בחר את הספר הנכון.')
+      } else {
+        setOcrNote('לא נמצא טקסט בעטיפה — אנא הקלד ידנית.')
       }
     } catch (err) {
       setOcrNote(`שגיאה בסריקה: ${err.message}`)
