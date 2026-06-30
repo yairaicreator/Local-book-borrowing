@@ -166,6 +166,58 @@ export async function scanImageText(file) {
   return { text, words }
 }
 
+// Smart OCR: search Google Books + Open Library with the full cover text.
+// If a book is found whose title words appear in the OCR, return full book info.
+// Otherwise fall back to bounding-box heuristic.
+export async function extractBookFromOCR(text, words) {
+  if (text.trim()) {
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1)
+    const query = lines.slice(0, 6).join(' ')
+
+    // Try Google Books
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5&key=${BOOKS_KEY}`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const match = (data.items || []).find(item => {
+          const titleWords = (item.volumeInfo.title || '').split(/\s+/).filter(w => w.length > 2)
+          const ocrL = text.toLowerCase()
+          // Accept if ≥1 title word found in OCR, or just take first result if query is rich enough
+          return titleWords.some(w => ocrL.includes(w.toLowerCase())) || lines.length >= 3
+        })
+        if (match) return { ...bookInfoToResult(match.volumeInfo), fromDatabase: true }
+      }
+    } catch { /* fall through */ }
+
+    // Try Open Library
+    try {
+      const res = await fetch(
+        `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&fields=title,author_name,first_sentence,subject&limit=5`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const doc = (data.docs || [])[0]
+        if (doc?.title) {
+          return {
+            title: doc.title,
+            author: (doc.author_name || []).join(', '),
+            description: doc.first_sentence?.value || doc.first_sentence || '',
+            topic: mapCategory(doc.subject),
+            coverUrl: null,
+            fromDatabase: true,
+          }
+        }
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Fall back to bounding-box heuristic
+  const { title, author } = extractTitleAuthor(words)
+  return { title, author, description: '', topic: null, coverUrl: null, fromDatabase: false }
+}
+
 export function extractTitleAuthor(words) {
   if (!words?.length) return { title: '', author: '' }
   const clusters = clusterByHeight(words)

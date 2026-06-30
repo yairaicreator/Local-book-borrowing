@@ -72,21 +72,21 @@ export default function HomeDesktop({ currentUser }) {
 
   // Build contact options for active book
   const ab = activeBook
-  let borrowDisabled = true, borrowLabel = 'Request to Borrow', borrowBg = '#E9E3D8', borrowInk = '#A39B90', borrowCursor = 'not-allowed'
+  let borrowDisabled = true, borrowLabel = 'בקש להשאיל', borrowBg = '#E9E3D8', borrowInk = '#A39B90', borrowCursor = 'not-allowed'
   let contactOptions = []
   if (ab) {
     const isAvail = ab.status === 'available'
     const isOwnBook = ab.add_by === currentUser.id
     if (isOwnBook) {
-      borrowDisabled = true; borrowLabel = 'This is your book'; borrowBg = '#F0ECE4'; borrowInk = '#A39B90'; borrowCursor = 'not-allowed'
+      borrowDisabled = true; borrowLabel = 'זה הספר שלך'; borrowBg = '#F0ECE4'; borrowInk = '#A39B90'; borrowCursor = 'not-allowed'
     } else if (!isAvail) {
       borrowDisabled = true
-      borrowLabel = ab.status === 'borrowed' ? 'Currently Borrowed' : 'Not Available'
+      borrowLabel = ab.status === 'borrowed' ? 'מושאל כרגע' : 'לא זמין'
     } else {
-      borrowDisabled = false; borrowLabel = 'Request to Borrow'; borrowBg = '#C05A3E'; borrowInk = '#F7F5F1'; borrowCursor = 'pointer'
+      borrowDisabled = false; borrowLabel = 'בקש להשאיל'; borrowBg = '#C05A3E'; borrowInk = '#F7F5F1'; borrowCursor = 'pointer'
     }
     const ownerName = ab.Users?.name || 'the owner'
-    const msg = `Hi ${ownerName}! I'd love to borrow "${ab.title}" from your Family Library shelf. Is it available? 📚`
+    const msg = `שלום ${ownerName}! אשמח לשאול את הספר "${ab.title}" ממדף הספרייה המשפחתית שלך. האם הספר זמין? 📚`
     const phone = ab.Users?.phone?.replace(/\D/g, '')
     const email = ab.Users?.email
     if (phone) {
@@ -98,8 +98,8 @@ export default function HomeDesktop({ currentUser }) {
 
   const s = ab ? (STATUS[ab.status] || STATUS.available) : null
   const ownerPal = ab ? avatarPalette(ab.add_by) : null
-  const holderLabel = !ab ? '' : ab.status === 'borrowed' ? 'Currently borrowed by' : ab.status === 'unavailable' ? 'Kept by' : 'On the shelf of'
-  const holderName = !ab ? '' : ab.status === 'borrowed' ? (ab.borrowed_by_name || '—') : ab.status === 'unavailable' ? (ab.Users?.name || 'Owner') + ' · not lending' : (ab.Users?.name || 'Unknown')
+  const holderLabel = !ab ? '' : ab.status === 'borrowed' ? 'מושאל כרגע על ידי' : ab.status === 'unavailable' ? 'נמצא אצל' : 'על המדף של'
+  const holderName = !ab ? '' : ab.status === 'borrowed' ? (ab.borrowed_by_name || '—') : ab.status === 'unavailable' ? (ab.Users?.name || 'בעלים') + ' · לא להשאלה' : (ab.Users?.name || 'לא ידוע')
 
   return (
     <div style={{ height: '100vh', display: 'flex', background: '#EDEAE5', fontFamily: "'Source Sans 3',sans-serif", color: '#2C2622', overflow: 'hidden' }}>
@@ -118,16 +118,16 @@ export default function HomeDesktop({ currentUser }) {
         </div>
 
         {/* nav */}
-        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#B4ABA0', fontWeight: 600, padding: '0 8px 8px' }}>Browse</div>
+        <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#B4ABA0', fontWeight: 600, padding: '0 8px 8px' }}>עיון</div>
         <NavBtn onClick={() => setFilter('user')} active={filter === 'user'} icon={
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={nu.color} strokeWidth="2.1" strokeLinecap="round"><circle cx="12" cy="8" r="4" /><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" /></svg>
-        } bg={nu.bg} color={nu.color} mb={4}>By person</NavBtn>
+        } bg={nu.bg} color={nu.color} mb={4}>לפי אדם</NavBtn>
         <NavBtn onClick={() => setFilter('topic')} active={filter === 'topic'} icon={
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={nt.color} strokeWidth="2.1" strokeLinecap="round"><path d="M4 5h16M4 12h16M4 19h10" /></svg>
-        } bg={nt.bg} color={nt.color}>By topic</NavBtn>
+        } bg={nt.bg} color={nt.color}>לפי נושא</NavBtn>
 
         {/* shelves */}
-        <div style={{ marginTop: 26, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#B4ABA0', fontWeight: 600, padding: '0 8px 10px' }}>Shelves</div>
+        <div style={{ marginTop: 26, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#B4ABA0', fontWeight: 600, padding: '0 8px 10px' }}>מדפים</div>
         <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', margin: '0 -6px', padding: '0 6px' }}>
           {shelfNav.map(s => (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 8px', borderRadius: 10 }}>
@@ -147,7 +147,7 @@ export default function HomeDesktop({ currentUser }) {
           <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: '#7A4A28', flexShrink: 0 }}>{initial(currentUser.name)}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.name}</div>
-            <div style={{ fontSize: 12, color: '#A39B90' }}>Your shelf</div>
+            <div style={{ fontSize: 12, color: '#A39B90' }}>המדף שלך</div>
           </div>
         </button>
       </aside>
@@ -157,21 +157,21 @@ export default function HomeDesktop({ currentUser }) {
         {/* top bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 40px', borderBottom: '1px solid #ECE7DE', background: '#FBFAF7' }}>
           <div style={{ flexShrink: 0 }}>
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622', lineHeight: 1.1 }}>{filter === 'user' ? 'Browse by person' : 'Browse by topic'}</div>
-            <div style={{ fontSize: 14, color: '#8A8278', marginTop: 3 }}>{books.length} {books.length === 1 ? 'book' : 'books'} shared across your circle</div>
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622', lineHeight: 1.1 }}>{filter === 'user' ? 'עיון לפי אדם' : 'עיון לפי נושא'}</div>
+            <div style={{ fontSize: 14, color: '#8A8278', marginTop: 3 }}>{books.length} {books.length === 1 ? 'ספר' : 'ספרים'} משותפים במעגל שלך</div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, width: 380, maxWidth: '42%', background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, padding: '11px 16px', boxShadow: '0 2px 8px -5px rgba(60,48,30,.12)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search titles or authors" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש כותרות או מחברים" dir="rtl" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }} />
           </div>
           <button onClick={() => setShowAdd(true)} style={{ flexShrink: 0, border: 'none', borderRadius: 13, padding: '13px 22px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 10px 22px -10px rgba(180,90,60,.7)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>Add a book
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>הוסף ספר
           </button>
         </div>
 
         {/* book grid */}
         <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '14px 40px 60px' }}>
-          {loading && <div style={{ textAlign: 'center', padding: '80px 0', color: '#A39B90' }}>Loading…</div>}
+          {loading && <div style={{ textAlign: 'center', padding: '80px 0', color: '#A39B90' }}>טוען…</div>}
 
           {!loading && groups.map(group => (
             <div key={group.key} style={{ marginTop: 30 }}>
@@ -211,7 +211,7 @@ export default function HomeDesktop({ currentUser }) {
               <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622', margin: '0 0 9px' }}>Your shelf is empty</h2>
               <p style={{ fontSize: 16, lineHeight: 1.55, color: '#7C756C', margin: '0 0 28px', maxWidth: 340 }}>Add the first book and start sharing reads with your family and friends.</p>
               <button onClick={() => setShowAdd(true)} style={{ border: 'none', borderRadius: 13, padding: '14px 28px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 12px 24px -10px rgba(180,90,60,.6)' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>Add a book
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>הוסף ספר
               </button>
             </div>
           )}
@@ -248,7 +248,7 @@ export default function HomeDesktop({ currentUser }) {
                 </div>
               </div>
               <div style={{ padding: '18px 34px 26px', borderTop: '1px solid #ECE7DE' }}>
-                {activeBook.add_by === currentUser.id && <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center', marginBottom: 10 }}>You added this book — others can borrow it from you.</div>}
+                {activeBook.add_by === currentUser.id && <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center', marginBottom: 10 }}>הוספת ספר זה — אחרים יכולים לשאול אותו ממך.</div>}
                 <button onClick={() => { if (!borrowDisabled) setShowContact(true) }} disabled={borrowDisabled} style={{ width: '100%', border: 'none', borderRadius: 14, padding: 16, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: borrowInk, background: borrowBg, cursor: borrowCursor }}>
                   {borrowLabel}
                 </button>
@@ -263,8 +263,8 @@ export default function HomeDesktop({ currentUser }) {
           {showContact && (
             <div onClick={() => setShowContact(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,18,.4)', zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'flFade .15s ease' }}>
               <div onClick={e => e.stopPropagation()} style={{ width: 420, maxWidth: '90%', background: '#F7F5F1', borderRadius: 20, padding: 28, animation: 'flPop .24s cubic-bezier(.22,1,.36,1)', boxShadow: '0 24px 56px -18px rgba(40,30,18,.55)' }}>
-                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622', marginBottom: 6 }}>Contact {activeBook.Users?.name || 'owner'}</div>
-                <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>Choose how to send your borrow request:</div>
+                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622', marginBottom: 6 }}>צור קשר עם {activeBook.Users?.name || 'הבעלים'}</div>
+                <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>בחר כיצד לשלוח את בקשת ההשאלה:</div>
                 {contactOptions.map(opt => (
                   <button key={opt.key} onClick={opt.go} style={{ width: '100%', border: '1.5px solid #ECE7DE', background: '#FFFFFF', borderRadius: 14, padding: '14px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
                     <div style={{ width: 42, height: 42, borderRadius: 12, background: opt.tint, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, flexShrink: 0 }}>{opt.icon}</div>
@@ -275,8 +275,8 @@ export default function HomeDesktop({ currentUser }) {
                     <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
                   </button>
                 ))}
-                {contactOptions.length === 0 && <div style={{ fontSize: 14, color: '#A39B90', fontStyle: 'italic', marginBottom: 14 }}>{activeBook.Users?.name || 'Owner'} hasn't added contact info yet.</div>}
-                <button onClick={() => setShowContact(false)} style={{ marginTop: 8, width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 13, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#6E675C', cursor: 'pointer' }}>Cancel</button>
+                {contactOptions.length === 0 && <div style={{ fontSize: 14, color: '#A39B90', fontStyle: 'italic', marginBottom: 14 }}>{activeBook.Users?.name || 'הבעלים'} לא הוסיף פרטי קשר עדיין.</div>}
+                <button onClick={() => setShowContact(false)} style={{ marginTop: 8, width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 13, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#6E675C', cursor: 'pointer' }}>ביטול</button>
               </div>
             </div>
           )}

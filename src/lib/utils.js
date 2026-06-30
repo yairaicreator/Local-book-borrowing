@@ -41,9 +41,9 @@ export function initial(name) {
 }
 
 export const STATUS = {
-  available:   { label: 'Available',   color: '#2E8B57', bg: '#E2F1E7' },
-  borrowed:    { label: 'Borrowed',    color: '#B8860B', bg: '#F6EDD4' },
-  unavailable: { label: 'Unavailable', color: '#B24A3A', bg: '#F4E2DD' },
+  available:   { label: 'זמין',     color: '#2E8B57', bg: '#E2F1E7' },
+  borrowed:    { label: 'מושאל',    color: '#B8860B', bg: '#F6EDD4' },
+  unavailable: { label: 'לא זמין', color: '#B24A3A', bg: '#F4E2DD' },
 }
 
 export const TOPICS = ['Fiction', 'Romance', 'Novel', 'Non-fiction', 'Thriller', 'Biography', 'Science', 'History', 'Other']
