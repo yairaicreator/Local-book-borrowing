@@ -174,39 +174,40 @@ export async function scanImageText(file) {
 }
 
 // ─── Option A: Gemini Vision ─────────────────────────────────────────────────
-
-function parseGeminiJson(raw) {
-  const s = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-  try { return JSON.parse(s) } catch {}
-  // Repair truncated JSON: Gemini sometimes cuts off mid-string if the output is long
-  try { return JSON.parse(s + '"}}') } catch {}
-  try { return JSON.parse(s + '"}') } catch {}
-  throw new Error('Gemini JSON parse failed: ' + s.slice(0, 80))
-}
-
-// Send the image directly to Gemini and ask it to identify title + author.
-// Gemini understands visual layout so it knows big text = title, smaller = author.
-// Throws on any failure so the caller can fall through to Option B.
-// Try models in order until one responds successfully.
-// 404 = model not available in this API version → try next.
-// 429 = quota exceeded → stop immediately (switching model won't help for minute-limit).
 const GEMINI_MODELS = [
-  'gemini-3.5-flash',   // Gemini 3.5 Flash (latest per docs)
-  'gemini-3.0-flash',   // Gemini 3 Flash (user requested)
-  'gemini-3-flash',     // alternate API naming
+  'gemini-3.5-flash',
+  'gemini-3.0-flash',
+  'gemini-3-flash',
   'gemini-2.5-flash',
-  'gemini-2.0-flash',   // confirmed to exist (gave 429, not 404)
+  'gemini-2.0-flash',
   'gemini-1.5-flash',
 ]
 
-const GEMINI_PROMPT = 'This is a book cover. The title is usually the largest text. The author name is usually smaller text below. Text may be in Hebrew (right-to-left). Ignore taglines, subtitles, prizes ("Nobel Prize"), publisher names. Return ONLY valid JSON, no markdown: {"title": "...", "author": "..."}'
+// Plain-text format is far more resilient than JSON.
+// Even a truncated response gives us the title, which is the most important field.
+const GEMINI_PROMPT = `This is a book cover. Find the title and author name.
+- Title = largest / most prominent text
+- Author = person's name (usually smaller, near top or bottom)
+- Text may be in Hebrew or English
+- Ignore taglines, award labels, publisher names, subtitles
+
+Reply in EXACTLY this format, two lines only:
+TITLE: <title>
+AUTHOR: <author>`
+
+function parseGeminiResponse(raw) {
+  const title = raw.match(/TITLE:\s*(.+)/i)?.[1]?.trim() || ''
+  const author = raw.match(/AUTHOR:\s*(.+)/i)?.[1]?.trim() || ''
+  if (!title && !author) throw new Error('Gemini returned no title or author')
+  return { title, author }
+}
 
 export async function analyzeBookCoverWithGemini(file) {
   const base64 = await fileToBase64(file)
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 500 },
+    generationConfig: { temperature: 0, maxOutputTokens: 200 },
   })
 
   let lastErr = 'no models tried'
@@ -226,9 +227,8 @@ export async function analyzeBookCoverWithGemini(file) {
 
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-    const result = parseGeminiJson(raw)
-    if (!result.title && !result.author) throw new Error('Gemini returned empty fields')
-    return { title: result.title || '', author: result.author || '' }
+    const result = parseGeminiResponse(raw)
+    return { title: result.title, author: result.author }
   }
   throw new Error(`Gemini unavailable: ${lastErr}`)
 }
