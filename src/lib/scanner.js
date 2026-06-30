@@ -142,6 +142,8 @@ function fileToBase64(file) {
 
 export async function scanImageText(file) {
   const base64 = await fileToBase64(file)
+  if (!base64) throw new Error('לא ניתן לקרוא את קובץ התמונה')
+  if (!VISION_KEY) throw new Error('Vision API key חסר')
   const res = await fetch(
     `https://vision.googleapis.com/v1/images:annotate?key=${VISION_KEY}`,
     {
