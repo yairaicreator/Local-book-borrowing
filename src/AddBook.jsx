@@ -114,12 +114,12 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
       // ── Option B: auto-fill search from OCR text (Gemini failed) ────────────
       const geminiErr = geminiResult.reason?.message || 'שגיאה לא ידועה'
       const ocrText = ocrResult.status === 'fulfilled' ? ocrResult.value.text : ''
-      if (ocrText.trim()) {
-        const query = buildSearchQuery(ocrText)
+      const query = ocrText.trim() ? buildSearchQuery(ocrText) : ''
+      if (query) {
         setSearchQuery(query)
         setOcrNote(`Gemini: ${geminiErr} — חפש את הספר בתיבה למטה ובחר תוצאה.`)
       } else {
-        setOcrNote(`Gemini: ${geminiErr} — לא נמצא טקסט בעטיפה, אנא הקלד ידנית.`)
+        setOcrNote(`לא זיהינו טקסט ברור בעטיפה — אנא הקלד כותרת ידנית.`)
       }
     } catch (err) {
       setOcrNote(`שגיאה בסריקה: ${err.message}`)
@@ -475,22 +475,26 @@ const TAGLINE_PATTERNS = [
   /מיליון/,
 ]
 
-const HEBREW_CHAR_RE = /[א-ת]/  // basic Hebrew alphabet
+const HEBREW_CHAR_RE = /[א-ת]/
+
+function isHebrewOrEnglish(line) {
+  // Must contain at least one Hebrew letter OR two consecutive Latin letters (a real English word).
+  // Rejects Devanagari, Cyrillic, CJK, and other scripts that Vision misreads decorative fonts as.
+  return /[א-ת]/.test(line) || /[A-Za-z]{2,}/.test(line)
+}
 
 function buildSearchQuery(ocrText) {
-  const allLines = ocrText
+  const cleanLines = ocrText
     .split('\n')
     .map(l => l.trim())
     .filter(l => l.length > 1)
+    .filter(isHebrewOrEnglish)
     .filter(l => !TAGLINE_PATTERNS.some(p => p.test(l)))
 
-  // Prefer lines that contain Hebrew characters.
-  // Decorative fonts are often misread as random Latin/Devanagari/Cyrillic —
-  // those lines have zero Hebrew chars and should be skipped when Hebrew lines exist.
-  const hebrewLines = allLines.filter(l => HEBREW_CHAR_RE.test(l))
-  const candidates = hebrewLines.length > 0 ? hebrewLines : allLines
+  const hebrewLines = cleanLines.filter(l => HEBREW_CHAR_RE.test(l))
+  const candidates = hebrewLines.length > 0 ? hebrewLines : cleanLines
 
-  return candidates.slice(0, 3).join(' ')
+  return candidates.slice(0, 3).join(' ')  // '' if nothing passed the filter
 }
 
 function SearchDropdown({ results, empty, onPick }) {

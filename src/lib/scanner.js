@@ -174,6 +174,16 @@ export async function scanImageText(file) {
 }
 
 // ─── Option A: Gemini Vision ─────────────────────────────────────────────────
+
+function parseGeminiJson(raw) {
+  const s = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  try { return JSON.parse(s) } catch {}
+  // Repair truncated JSON: Gemini sometimes cuts off mid-string if the output is long
+  try { return JSON.parse(s + '"}}') } catch {}
+  try { return JSON.parse(s + '"}') } catch {}
+  throw new Error('Gemini JSON parse failed: ' + s.slice(0, 80))
+}
+
 // Send the image directly to Gemini and ask it to identify title + author.
 // Gemini understands visual layout so it knows big text = title, smaller = author.
 // Throws on any failure so the caller can fall through to Option B.
@@ -196,7 +206,7 @@ export async function analyzeBookCoverWithGemini(file) {
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 200 },
+    generationConfig: { temperature: 0, maxOutputTokens: 500 },
   })
 
   let lastErr = 'no models tried'
@@ -216,8 +226,7 @@ export async function analyzeBookCoverWithGemini(file) {
 
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
-    const jsonStr = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-    const result = JSON.parse(jsonStr)
+    const result = parseGeminiJson(raw)
     if (!result.title && !result.author) throw new Error('Gemini returned empty fields')
     return { title: result.title || '', author: result.author || '' }
   }
