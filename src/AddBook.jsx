@@ -63,33 +63,12 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setOcrNote('')
     setScanning(true)
     try {
-      // Run Vision OCR and Gemini in parallel — both start immediately
-      const [ocrResult, geminiResult] = await Promise.allSettled([
-        scanImageText(file),
-        analyzeBookCoverWithGemini(file),
-      ])
-
-      // ── Option A: Gemini ──────────────────────────────────────────────────
-      if (geminiResult.status === 'fulfilled') {
-        const { title: t, author: a } = geminiResult.value
-        if (t && !title) setTitle(t)
-        if (a && !author) setAuthor(a)
-        setOcrNote(`✓ זוהה על ידי AI: "${t}"`)
-        return
-      }
-
-      // ── Option B: auto-fill search from OCR text (Gemini failed) ────────────
-      const geminiErr = geminiResult.reason?.message || 'שגיאה לא ידועה'
-      const ocrText = ocrResult.status === 'fulfilled' ? ocrResult.value.text : ''
-      const query = ocrText.trim() ? buildSearchQuery(ocrText) : ''
-      if (query) {
-        setSearchQuery(query)
-        setOcrNote(`Gemini: ${geminiErr} — חפש את הספר בתיבה למטה ובחר תוצאה.`)
-      } else {
-        setOcrNote(`לא זיהינו טקסט ברור בעטיפה — אנא הקלד כותרת ידנית.`)
-      }
+      const { title: t, author: a } = await analyzeBookCoverWithGemini(file)
+      if (t && !title) setTitle(t)
+      if (a && !author) setAuthor(a)
+      setOcrNote(`✓ זוהה על ידי AI: "${t}"`)
     } catch (err) {
-      setOcrNote(`שגיאה בסריקה: ${err.message}`)
+      setOcrNote(`לא הצלחנו לזהות את הספר — חפש כותרת בתיבת החיפוש למטה.`)
     } finally { setScanning(false) }
   }
 
