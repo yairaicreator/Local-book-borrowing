@@ -9,8 +9,8 @@ function fileToBase64(file) {
   })
 }
 
-// Returns the full detected text as a plain string, or '' on failure.
-// Google Vision supports Hebrew, Arabic, Latin, and many other scripts.
+// Returns { text: string, words: AnnotatedWord[] }
+// words have: { text, h (height), x (center), y (top) }
 export async function scanImageText(file) {
   const base64 = await fileToBase64(file)
   const res = await fetch(
@@ -31,14 +31,74 @@ export async function scanImageText(file) {
     throw new Error(`Vision API ${res.status}: ${errBody}`)
   }
   const data = await res.json()
-  // Check for API-level error in the response body
   if (data.responses?.[0]?.error) {
     throw new Error(data.responses[0].error.message)
   }
-  return data.responses?.[0]?.fullTextAnnotation?.text?.trim() || ''
+
+  const annotations = data.responses?.[0]?.textAnnotations
+  if (!annotations?.length) return { text: '', words: [] }
+
+  const text = annotations[0].description?.trim() || ''
+
+  const words = annotations.slice(1).map(a => {
+    const verts = a.boundingPoly?.vertices || []
+    const ys = verts.map(v => v.y ?? 0)
+    const xs = verts.map(v => v.x ?? 0)
+    return {
+      text: a.description,
+      h: Math.max(...ys) - Math.min(...ys),
+      x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      y: Math.min(...ys),
+    }
+  }).filter(w => w.text?.trim())
+
+  return { text, words }
 }
 
-// Split Vision's output into non-empty lines
+// Uses font size (bounding box height) to identify title and author.
+// Title = largest text on cover (≥80% of max height).
+// Author = next size tier (40–79% of max height), first visual line only.
+// This ignores publisher names, editor credits, subtitles etc. which are smaller.
+export function extractTitleAuthor(words) {
+  if (!words?.length) return { title: '', author: '' }
+
+  const maxH = Math.max(...words.map(w => w.h))
+
+  const titleWords = words.filter(w => w.h >= maxH * 0.8)
+  const authorWords = words.filter(w => w.h >= maxH * 0.4 && w.h < maxH * 0.8)
+
+  const title = linesToText(groupByLines(titleWords))
+  // Only take the first visual line of author-sized words
+  const authorLines = groupByLines(authorWords)
+  const author = authorLines.length ? authorLines[0].words.map(w => w.text).join(' ') : ''
+
+  return { title, author }
+}
+
+// Group words into visual lines sorted top-to-bottom.
+// Within each line words are sorted right-to-left (correct for Hebrew and safe for LTR).
+function groupByLines(words) {
+  const sorted = [...words].sort((a, b) => a.y - b.y)
+  const lines = []
+  sorted.forEach(w => {
+    const last = lines[lines.length - 1]
+    // Two words are on the same line if y difference < half the max word height
+    if (last && w.y - last.baseY < Math.max(...words.map(w => w.h)) * 0.5) {
+      last.words.push(w)
+    } else {
+      lines.push({ baseY: w.y, words: [w] })
+    }
+  })
+  // Sort each line right-to-left (works for Hebrew; harmless for LTR)
+  lines.forEach(l => l.words.sort((a, b) => b.x - a.x))
+  return lines
+}
+
+function linesToText(lines) {
+  return lines.map(l => l.words.map(w => w.text).join(' ')).join(' ')
+}
+
+// Split Vision's full text into non-empty lines (used for back cover description)
 export function textToLines(text) {
   return text.split('\n').map(l => l.trim()).filter(Boolean)
 }

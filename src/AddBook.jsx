@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPICS } from './lib/utils'
-import { scanImageText, textToLines, detectTopic } from './lib/scanner'
+import { scanImageText, extractTitleAuthor, detectTopic } from './lib/scanner'
 
 const isMobileDevice = () => window.innerWidth < 640
 
@@ -31,15 +31,11 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setOcrNote('')
     setScanning(true)
     try {
-      const text = await scanImageText(file)
-      if (text) {
-        const lines = textToLines(text)
-        if (lines.length >= 2) {
-          if (!title) setTitle(lines.slice(0, lines.length - 1).join(' '))
-          if (!author) setAuthor(lines[lines.length - 1])
-        } else if (lines.length === 1) {
-          if (!title) setTitle(lines[0])
-        }
+      const { text, words } = await scanImageText(file)
+      if (words.length > 0) {
+        const { title: t, author: a } = extractTitleAuthor(words)
+        if (t && !title) setTitle(t)
+        if (a && !author) setAuthor(a)
         const guessed = detectTopic(text)
         if (guessed) setTopic(guessed)
       } else {
@@ -56,7 +52,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     setBackPreview(URL.createObjectURL(file))
     setBackScanning(true)
     try {
-      const text = await scanImageText(file)
+      const { text } = await scanImageText(file)
       if (text) {
         if (!description) setDescription(text.replace(/\n/g, ' ').trim())
         const guessed = detectTopic(text)
