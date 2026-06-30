@@ -199,15 +199,15 @@ Rules:
 - Output ONLY the two lines above, no other text`
 
 function parseGeminiResponse(raw) {
-  // Try English labels
-  let title = raw.match(/^TITLE:\s*(.+)/im)?.[1]?.trim() || ''
-  let author = raw.match(/^AUTHOR:\s*(.+)/im)?.[1]?.trim() || ''
+  // Match TITLE:/AUTHOR: anywhere in the response (Gemini sometimes adds preamble commentary)
+  let title = raw.match(/TITLE:\s*(.+)/i)?.[1]?.trim() || ''
+  let author = raw.match(/AUTHOR:\s*(.+)/i)?.[1]?.trim() || ''
 
-  // Try Hebrew labels — Gemini sometimes responds in the book's language
-  if (!title) title = raw.match(/^כותרת[:\s]+(.+)/m)?.[1]?.trim() || ''
-  if (!author) author = raw.match(/^(?:מחבר|סופר|מחברת)[:\s]+(.+)/m)?.[1]?.trim() || ''
+  // Hebrew labels fallback
+  if (!title) title = raw.match(/כותרת[:\s]+(.+)/)?.[1]?.trim() || ''
+  if (!author) author = raw.match(/(?:מחבר|סופר|מחברת)[:\s]+(.+)/)?.[1]?.trim() || ''
 
-  // Strip any stray quotes Gemini added around the value
+  // Strip stray quotes
   title = title.replace(/^["'"״]|["'"״]$/g, '').trim()
   author = author.replace(/^["'"״]|["'"״]$/g, '').trim()
   if (author.toLowerCase() === 'unknown') author = ''
