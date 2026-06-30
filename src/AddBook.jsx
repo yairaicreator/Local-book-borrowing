@@ -111,14 +111,11 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         return
       }
 
-      // ── Option B: auto-fill search from first 2 OCR lines (Gemini failed) ─
+      // ── Option B: auto-fill search from OCR text (Gemini failed) ────────────
       const geminiErr = geminiResult.reason?.message || 'שגיאה לא ידועה'
       const ocrText = ocrResult.status === 'fulfilled' ? ocrResult.value.text : ''
       if (ocrText.trim()) {
-        // Use only the first 2 lines — title is line 1, author line 2.
-        // Skipping further lines avoids sending taglines/subtitles to the search.
-        const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 1)
-        const query = lines.slice(0, 2).join(' ')
+        const query = buildSearchQuery(ocrText)
         setSearchQuery(query)
         setOcrNote(`Gemini: ${geminiErr} — חפש את הספר בתיבה למטה ובחר תוצאה.`)
       } else {
@@ -456,6 +453,37 @@ function PhotoIcon() {
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
     </div>
   )
+}
+
+// Tagline patterns to strip from OCR text before using as a search query.
+// Lines matching these are prizes, publisher info, review quotes, etc.
+const TAGLINE_PATTERNS = [
+  /פרס/,           // prize (פרס נובל etc.)
+  /הוצאה/,         // publisher
+  /מהדורה/,        // edition
+  /רב.?מכר/,       // bestseller
+  /\d{4}/,         // year number
+  /ISBN/i,
+  /©/,
+  /כל הזכויות/,    // all rights reserved
+  /ניו יורק טיימס/,
+  /times/i,
+  /bestsell/i,
+  /award/i,
+  /prize/i,
+  /million/i,
+  /מיליון/,
+]
+
+function buildSearchQuery(ocrText) {
+  const lines = ocrText
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 1)
+    .filter(l => !TAGLINE_PATTERNS.some(p => p.test(l)))
+
+  // Take up to 3 cleaned lines: typically title (may span 2 lines) + author
+  return lines.slice(0, 3).join(' ')
 }
 
 function SearchDropdown({ results, empty, onPick }) {
