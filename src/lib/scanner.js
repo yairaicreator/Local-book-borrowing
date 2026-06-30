@@ -196,9 +196,22 @@ TITLE: <title>
 AUTHOR: <author>`
 
 function parseGeminiResponse(raw) {
-  const title = raw.match(/TITLE:\s*(.+)/i)?.[1]?.trim() || ''
-  const author = raw.match(/AUTHOR:\s*(.+)/i)?.[1]?.trim() || ''
-  if (!title && !author) throw new Error('Gemini returned no title or author')
+  // Try English labels (TITLE: / AUTHOR:)
+  let title = raw.match(/TITLE:\s*(.+)/i)?.[1]?.trim() || ''
+  let author = raw.match(/AUTHOR:\s*(.+)/i)?.[1]?.trim() || ''
+
+  // Try Hebrew labels (כותרת: / מחבר: / סופר:) — Gemini sometimes answers in the book's language
+  if (!title) title = raw.match(/כותרת[:\s]+(.+)/)?.[1]?.trim() || ''
+  if (!author) author = raw.match(/(?:מחבר|סופר|מחברת)[:\s]+(.+)/)?.[1]?.trim() || ''
+
+  // Last resort: if response is exactly 1-2 short lines with no label, treat first as title
+  if (!title) {
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 1 && l.length < 120)
+    if (lines.length >= 1) title = lines[0]
+    if (lines.length >= 2 && !author) author = lines[1]
+  }
+
+  if (!title && !author) throw new Error(`Gemini format unknown: "${raw.slice(0, 120)}"`)
   return { title, author }
 }
 
