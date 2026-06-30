@@ -249,19 +249,16 @@ export async function analyzeBookCoverWithGemini(file) {
   throw new Error(`Gemini unavailable: ${lastErr}`)
 }
 
-const GEMINI_BACK_PROMPT = `You are looking at the back cover of a book.
-Read all the text on this cover and extract:
-1. The book description/synopsis (what the book is about)
-2. The topic/genre
+const GEMINI_BACK_PROMPT = `Look at this book back cover image.
+Copy the synopsis/description paragraph exactly as written (in Hebrew or English).
+Then on the last line write the genre.
 
-Reply in EXACTLY this format:
-DESCRIPTION: <copy the synopsis text here, in the original language>
-TOPIC: <one word: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, or Other>
+Output format — description first, genre last:
+<paste the synopsis text here, word for word>
+TOPIC: Fiction
 
-Rules:
-- Description = the main story/synopsis paragraph, NOT reviews, NOT author bio, NOT awards
-- Copy the text exactly as it appears on the cover (Hebrew or English)
-- Do NOT add any other text or commentary`
+Replace "Fiction" with one of: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, Other.
+Do NOT add any labels, introductions, or commentary. Just the synopsis text and the TOPIC line.`
 
 const TOPICS_LIST = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other']
 
@@ -291,14 +288,18 @@ export async function analyzeBackCoverWithGemini(file) {
     const data = await res.json()
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
 
-    // Extract description: everything after DESCRIPTION: up to the TOPIC: line
-    const descMatch = raw.match(/DESCRIPTION:\s*([^\n].+?)(?=\nTOPIC:|\nתיאור:|\nנושא:|$)/is)
-    // Also try Hebrew label
-    const hebrewDescMatch = raw.match(/(?:תיאור|סיכום)[:\s]+([^\n].+?)(?=\nTOPIC:|\nנושא:|$)/is)
-    const description = (descMatch?.[1] || hebrewDescMatch?.[1] || '').trim()
-
-    const topicRaw = (raw.match(/TOPIC:\s*(.+)/i)?.[1] || raw.match(/(?:נושא|ז'אנר)[:\s]+(.+)/i)?.[1] || '').trim()
+    // Extract topic from last TOPIC: line
+    const topicRaw = (raw.match(/TOPIC:\s*(.+)/i)?.[1] || '').trim()
     const topic = TOPICS_LIST.includes(topicRaw) ? topicRaw : null
+
+    // Description = everything before the TOPIC: line, stripped of any quoted wrappers
+    let description = raw.replace(/\nTOPIC:.+/i, '').trim()
+
+    // If Gemini still added commentary, pull out all quoted Hebrew/English text and join it
+    if (/^[A-Za-z]/.test(description) && description.includes('"')) {
+      const quoted = [...description.matchAll(/"([^"]{10,})"/g)].map(m => m[1])
+      if (quoted.length) description = quoted.join(' ')
+    }
 
     return { description, topic, raw }
   }
