@@ -121,7 +121,7 @@ export default function Home({ currentUser }) {
           </svg>
           <input
             value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search titles or authors"
+            placeholder="חיפוש ספרים ומחברים" dir="rtl"
             style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }}
           />
         </div>
@@ -132,13 +132,13 @@ export default function Home({ currentUser }) {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={pu.color} strokeWidth="2.2" strokeLinecap="round">
               <circle cx="12" cy="8" r="4" /><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" />
             </svg>
-            By User
+            לפי משתמש
           </PillBtn>
           <PillBtn onClick={() => setFilter('topic')} pal={pt}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={pt.color} strokeWidth="2.2" strokeLinecap="round">
               <path d="M4 5h16M4 12h16M4 19h10" />
             </svg>
-            By Topic
+            לפי נושא
           </PillBtn>
         </div>
       </div>
@@ -146,7 +146,7 @@ export default function Home({ currentUser }) {
       {/* feed */}
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '8px 0 110px' }}>
         {loading && (
-          <div style={{ textAlign: 'center', padding: '60px 30px', color: '#A39B90', fontSize: 15 }}>Loading…</div>
+          <div style={{ textAlign: 'center', padding: '60px 30px', color: '#A39B90', fontSize: 15 }}>טוען…</div>
         )}
 
         {!loading && groups.map(group => (
@@ -162,7 +162,7 @@ export default function Home({ currentUser }) {
               </div>
               <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 17, color: '#2C2622' }}>{group.title}</div>
               <div style={{ fontSize: 13, color: '#A39B90', fontWeight: 500 }}>
-                {group.count} {group.count === 1 ? 'book' : 'books'}
+                {group.count} {group.count === 1 ? 'ספר' : 'ספרים'}
               </div>
             </div>
             <div className="fl-scroll" style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '2px 20px 6px' }}>

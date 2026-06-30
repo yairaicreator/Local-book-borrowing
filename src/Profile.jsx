@@ -10,6 +10,7 @@ export default function Profile({ currentUser, onClose }) {
   const [readingList, setReadingList] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddRL, setShowAddRL] = useState(false)
+  const [removingBorrow, setRemovingBorrow] = useState(null)
 
   useEffect(() => { fetchAll() }, [])
 
@@ -25,6 +26,13 @@ export default function Profile({ currentUser, onClose }) {
     setLoading(false)
   }
 
+  async function removeBorrow(b) {
+    setRemovingBorrow(b.id)
+    await supabase.from('borrows').delete().eq('id', b.id)
+    setBorrows(prev => prev.filter(r => r.id !== b.id))
+    setRemovingBorrow(null)
+  }
+
   async function toggleRead(item) {
     const next = !item.is_read
     await supabase.from('reading_list').update({ is_read: next }).eq('id', item.id)
@@ -38,7 +46,6 @@ export default function Profile({ currentUser, onClose }) {
 
   async function handleAdded() {
     setShowAddRL(false)
-    // re-fetch just the reading list
     const { data } = await supabase
       .from('reading_list')
       .select('*, Books(*, Users(name))')
@@ -68,7 +75,7 @@ export default function Profile({ currentUser, onClose }) {
             <path d="M15 5l-7 7 7 7" />
           </svg>
         </button>
-        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622' }}>My Profile</div>
+        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622' }}>הפרופיל שלי</div>
       </div>
 
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px 48px' }}>
@@ -90,13 +97,13 @@ export default function Profile({ currentUser, onClose }) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', color: '#A39B90', fontSize: 15, padding: 40 }}>Loading…</div>
+          <div style={{ textAlign: 'center', color: '#A39B90', fontSize: 15, padding: 40 }}>טוען…</div>
         ) : (<>
 
-          {/* ── My Shelf ── */}
-          <Section title="My Shelf" count={myBooks.length}>
+          {/* ── המדף שלי ── */}
+          <Section title="המדף שלי" count={myBooks.length}>
             {myBooks.length === 0
-              ? <Empty>You haven't added any books yet.</Empty>
+              ? <Empty>עדיין לא הוספת ספרים.</Empty>
               : (
                 <div className="fl-scroll" style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 0 6px' }}>
                   {myBooks.map(book => {
@@ -117,10 +124,10 @@ export default function Profile({ currentUser, onClose }) {
             }
           </Section>
 
-          {/* ── Books I'm Borrowing ── */}
-          <Section title="Books I'm Borrowing" count={borrows.length}>
+          {/* ── ספרים שאני שואל ── */}
+          <Section title="ספרים שאני שואל" count={borrows.length}>
             {borrows.length === 0
-              ? <Empty>No active borrows — request a book to see it here.</Empty>
+              ? <Empty>אין השאלות פעילות — בקש ספר כדי לראות אותו כאן.</Empty>
               : borrows.map(b => {
                   const book = b.Books
                   const s = STATUS[book?.status] || STATUS.available
@@ -129,26 +136,39 @@ export default function Profile({ currentUser, onClose }) {
                       <BookCover book={book || {}} width={48} height={68} fontSize={9} authorSize={7} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622', marginBottom: 1 }}>{book?.title}</div>
-                        <div style={{ fontSize: 12, color: '#7C756C' }}>by {book?.author}</div>
+                        <div style={{ fontSize: 12, color: '#7C756C' }}>מאת {book?.author}</div>
                         <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>
-                          From <strong style={{ color: '#6B5440' }}>{book?.Users?.name}</strong>'s shelf
+                          מהמדף של <strong style={{ color: '#6B5440' }}>{book?.Users?.name}</strong>
                         </div>
                       </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, color: s.color, background: s.bg,
-                        padding: '4px 8px', borderRadius: 999, flex: 'none',
-                      }}>{s.label}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flex: 'none' }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, color: s.color, background: s.bg,
+                          padding: '4px 8px', borderRadius: 999,
+                        }}>{s.label}</span>
+                        <button
+                          onClick={() => removeBorrow(b)}
+                          disabled={removingBorrow === b.id}
+                          style={{
+                            border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 8,
+                            padding: '4px 10px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif",
+                            fontWeight: 600, color: '#B24A3A', cursor: 'pointer',
+                          }}
+                        >
+                          {removingBorrow === b.id ? '…' : 'הסר'}
+                        </button>
+                      </div>
                     </div>
                   )
                 })
             }
           </Section>
 
-          {/* ── Reading List ── */}
+          {/* ── רשימת קריאה ── */}
           <Section
-            title="Reading List"
+            title="רשימת קריאה"
             count={readingList.length}
-            subtitle={readingList.length > 0 ? `${readCount} of ${readingList.length} read` : null}
+            subtitle={readingList.length > 0 ? `${readCount} מתוך ${readingList.length} נקראו` : null}
             action={
               <button onClick={() => setShowAddRL(true)} style={{
                 width: 28, height: 28, borderRadius: 9, border: 'none',
@@ -163,17 +183,13 @@ export default function Profile({ currentUser, onClose }) {
             }
           >
             {readingList.length === 0
-              ? <Empty>Tap + to add books you want to read.</Empty>
+              ? <Empty>לחץ + להוסיף ספרים שרוצה לקרוא.</Empty>
               : readingList.map(item => {
-                  // support both library books and custom entries
                   const book = item.Books
                   const title = book?.title || item.custom_title
                   const author = book?.author || item.custom_author
-                  const imageUrl = book?.image_url || item.custom_image_url
-                  const topic = book?.topic || item.custom_topic
-                  const source = book?.Users?.name ? `From ${book.Users.name}'s shelf` : 'Custom book'
+                  const source = book?.Users?.name ? `מהמדף של ${book.Users.name}` : 'ספר מותאם'
 
-                  // build a display object for BookCover
                   const coverBook = book || {
                     id: item.id,
                     title: item.custom_title,
@@ -207,7 +223,7 @@ export default function Profile({ currentUser, onClose }) {
                         }}>
                           {title}
                         </div>
-                        {author && <div style={{ fontSize: 12, color: '#7C756C' }}>by {author}</div>}
+                        {author && <div style={{ fontSize: 12, color: '#7C756C' }}>מאת {author}</div>}
                         <div style={{ fontSize: 12, color: '#A39B90', marginTop: 2 }}>{source}</div>
                       </div>
 
@@ -228,7 +244,6 @@ export default function Profile({ currentUser, onClose }) {
         </>)}
       </div>
 
-      {/* Add to reading list sheet */}
       {showAddRL && (
         <AddToReadingList
           currentUser={currentUser}

@@ -8,6 +8,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
   const [inReadingList, setInReadingList] = useState(false)
   const [rlLoading, setRlLoading] = useState(false)
   const [showBack, setShowBack] = useState(false)
+  const [notifSent, setNotifSent] = useState(false)
 
   useEffect(() => {
     supabase.from('reading_list')
@@ -52,11 +53,17 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
     onBorrow(book)
   }
 
-  function openWhatsApp() { window.open(`https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow() }
-  function openSMS() { window.open(`sms:${ownerPhone}?body=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow() }
+  async function sendInAppNotification() {
+    await recordBorrow()
+    setNotifSent(true)
+    setTimeout(() => { setShowContact(false); setNotifSent(false) }, 1400)
+  }
+
+  function openWhatsApp() { window.open(`https://wa.me/${ownerPhone}?text=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow(); setShowContact(false) }
+  function openSMS() { window.open(`sms:${ownerPhone}?body=${encodeURIComponent(msgText)}`, '_blank'); recordBorrow(); setShowContact(false) }
   function openEmail() {
     window.open(`mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`, '_blank')
-    recordBorrow()
+    recordBorrow(); setShowContact(false)
   }
 
   async function toggleReadingList() {
@@ -129,7 +136,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
             )}
             {canBorrow && (
               <button onClick={() => setShowContact(true)} style={{
-                marginRight: 'auto', border: 'none', borderRadius: 999, padding: '6px 16px',
+                marginRight: 'auto', border: 'none', borderRadius: 999, padding: '7px 16px',
                 background: '#C05A3E', color: '#F7F5F1', fontFamily: "'Source Sans 3',sans-serif",
                 fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
               }}>
@@ -184,19 +191,23 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
           )}
         </div>
 
-        {isOwnBook && (
-          <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div style={{ flex: 1, fontSize: 13, color: '#A39B90', display: 'flex', alignItems: 'center' }}>
-                הוספת ספר זה — אחרים יכולים לשאול ממך.
-              </div>
-              {onEdit && (
-                <button onClick={() => onEdit(book)} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '8px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                  ערוך
-                </button>
-              )}
+        {isOwnBook && onEdit && (
+          <div style={{ padding: '14px 24px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 13, color: '#A39B90', textAlign: 'center' }}>
+              הוספת ספר זה — אחרים יכולים לשאול ממך.
             </div>
+            <button onClick={() => onEdit(book)} style={{
+              width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF',
+              borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif",
+              fontWeight: 600, fontSize: 16, color: '#2C2622', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              ערוך ספר
+            </button>
           </div>
         )}
       </div>
@@ -215,36 +226,54 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
             boxShadow: '0 -12px 32px -12px rgba(40,30,18,.4)',
           }}>
             <div style={{ width: 38, height: 5, borderRadius: 3, background: '#DDD6CA', margin: '0 auto 20px' }} />
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>
-              צור קשר עם {ownerName}
-            </div>
-            <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>
-              בחר כיצד לשלוח את בקשת ההשאלה:
-            </div>
 
-            {ownerPhone ? (<>
-              <ContactBtn icon="💬" label="WhatsApp" sub={book.Users?.phone} onClick={openWhatsApp} color="#25D366" />
-              <ContactBtn icon="📱" label="SMS" sub={book.Users?.phone} onClick={openSMS} color="#5A7FE0" />
-            </>) : (
-              <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
-                {ownerName} לא הוסיף מספר טלפון.
+            {notifSent ? (
+              <div style={{ textAlign: 'center', padding: '20px 0 10px' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>הבקשה נשלחה!</div>
+                <div style={{ fontSize: 14, color: '#7C756C' }}>הבעלים יראה את ההודעה שלך.</div>
               </div>
-            )}
-
-            {ownerEmail ? (
-              <ContactBtn icon="✉️" label="אימייל" sub={book.Users?.email} onClick={openEmail} color="#C05A3E" />
             ) : (
-              <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
-                {ownerName} לא הוסיף כתובת אימייל.
-              </div>
-            )}
+              <>
+                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>
+                  צור קשר עם {ownerName}
+                </div>
+                <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>
+                  בחר כיצד לשלוח את בקשת ההשאלה:
+                </div>
 
-            <button onClick={() => setShowContact(false)} style={{
-              marginTop: 18, width: '100%', border: '1.5px solid #E7E1D6',
-              background: 'transparent', borderRadius: 14, padding: 14,
-              fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16,
-              color: '#6E675C', cursor: 'pointer',
-            }}>ביטול</button>
+                {/* In-app notification — always available */}
+                <ContactBtn
+                  icon="🔔"
+                  label="הודעה בתוך האפליקציה"
+                  sub="הבעלים יקבל התראה ישירות"
+                  onClick={sendInAppNotification}
+                  color="#C05A3E"
+                />
+
+                {ownerPhone ? (<>
+                  <ContactBtn icon="💬" label="WhatsApp" sub={book.Users?.phone} onClick={openWhatsApp} color="#25D366" />
+                  <ContactBtn icon="📱" label="SMS" sub={book.Users?.phone} onClick={openSMS} color="#5A7FE0" />
+                </>) : null}
+
+                {ownerEmail ? (
+                  <ContactBtn icon="✉️" label="אימייל" sub={book.Users?.email} onClick={openEmail} color="#C05A3E" />
+                ) : null}
+
+                {!ownerPhone && !ownerEmail && (
+                  <div style={{ fontSize: 14, color: '#A39B90', marginBottom: 14, fontStyle: 'italic' }}>
+                    {ownerName} לא הוסיף פרטי קשר — ניתן לשלוח הודעה בתוך האפליקציה.
+                  </div>
+                )}
+
+                <button onClick={() => setShowContact(false)} style={{
+                  marginTop: 10, width: '100%', border: '1.5px solid #E7E1D6',
+                  background: 'transparent', borderRadius: 14, padding: 14,
+                  fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16,
+                  color: '#6E675C', cursor: 'pointer',
+                }}>ביטול</button>
+              </>
+            )}
           </div>
         </>
       )}
