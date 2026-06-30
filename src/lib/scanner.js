@@ -221,7 +221,7 @@ export async function analyzeBookCoverWithGemini(file) {
   const mimeType = file.type || 'image/jpeg'
   const body = JSON.stringify({
     contents: [{ parts: [{ inlineData: { mimeType, data: base64 } }, { text: GEMINI_PROMPT }] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 200 },
+    generationConfig: { temperature: 0, maxOutputTokens: 600 },
   })
 
   let lastErr = 'no models tried'
