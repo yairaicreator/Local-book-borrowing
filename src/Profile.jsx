@@ -6,10 +6,13 @@ import AddToReadingList from './AddToReadingList'
 export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) {
   const [myBooks, setMyBooks] = useState([])
   const [borrows, setBorrows] = useState([])
+  const [incoming, setIncoming] = useState([])
   const [readingList, setReadingList] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddRL, setShowAddRL] = useState(false)
   const [removingBorrow, setRemovingBorrow] = useState(null)
+  const [busyIncoming, setBusyIncoming] = useState(null)
+  const [returningBorrow, setReturningBorrow] = useState(null)
 
   // profile edit state
   const [editingProfile, setEditingProfile] = useState(false)
@@ -22,13 +25,15 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [booksRes, borrowsRes, rlRes] = await Promise.all([
+    const [booksRes, borrowsRes, incomingRes, rlRes] = await Promise.all([
       supabase.from('Books').select('*').eq('add_by', currentUser.id).order('created_at'),
       supabase.from('borrows').select('*, Books(*, Users(name))').eq('borrower_id', currentUser.id).order('created_at', { ascending: false }),
+      supabase.from('borrows').select('*, Books!inner(id, title, author, add_by), Users!borrower_id(name)').eq('Books.add_by', currentUser.id).eq('status', 'requested').order('created_at', { ascending: false }),
       supabase.from('reading_list').select('*, Books(*, Users(name))').eq('user_id', currentUser.id).order('created_at'),
     ])
     setMyBooks(booksRes.data || [])
     setBorrows(borrowsRes.data || [])
+    setIncoming(incomingRes.data || [])
     setReadingList(rlRes.data || [])
     setLoading(false)
   }
@@ -56,6 +61,35 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
     setRemovingBorrow(null)
   }
 
+  async function handOverBook(req) {
+    setBusyIncoming(req.id)
+    await supabase.from('borrows').update({ status: 'borrowed' }).eq('id', req.id)
+    setIncoming(prev => prev.filter(r => r.id !== req.id))
+    setBusyIncoming(null)
+  }
+
+  async function declineRequest(req) {
+    setBusyIncoming(req.id)
+    await supabase.from('borrows').delete().eq('id', req.id)
+    setIncoming(prev => prev.filter(r => r.id !== req.id))
+    setBusyIncoming(null)
+  }
+
+  async function markReturned(b) {
+    setReturningBorrow(b.id)
+    await supabase.from('borrows').delete().eq('id', b.id)
+    if (b.book_id) {
+      await supabase.from('reading_list').upsert(
+        { user_id: currentUser.id, book_id: b.book_id, is_read: true },
+        { onConflict: 'user_id,book_id' }
+      )
+    }
+    setBorrows(prev => prev.filter(r => r.id !== b.id))
+    const { data } = await supabase.from('reading_list').select('*, Books(*, Users(name))').eq('user_id', currentUser.id).order('created_at')
+    setReadingList(data || [])
+    setReturningBorrow(null)
+  }
+
   async function toggleRead(item) {
     const next = !item.is_read
     await supabase.from('reading_list').update({ is_read: next }).eq('id', item.id)
@@ -76,6 +110,8 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
   const pal = avatarPalette(currentUser.id)
   const readCount = readingList.filter(r => r.is_read).length
   const existingBookIds = readingList.filter(r => r.book_id).map(r => r.book_id)
+  const requestedBorrows = borrows.filter(b => b.status !== 'borrowed')
+  const activeBorrows = borrows.filter(b => b.status === 'borrowed')
 
   const inputStyle = {
     width: '100%', border: '1.5px solid #E7E1D6', borderRadius: 12, padding: '12px 14px',
@@ -136,6 +172,29 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
           <div style={{ textAlign: 'center', color: '#A39B90', fontSize: 15, padding: 40 }}>טוען…</div>
         ) : (<>
 
+          {/* ── בקשות שקיבלת ── */}
+          <Section title="בקשות שקיבלת" count={incoming.length}>
+            {incoming.length === 0
+              ? <Empty>אין בקשות חדשות — כשמישהו יבקש לשאול ספר שלך, זה יופיע כאן.</Empty>
+              : incoming.map(req => (
+                  <div key={req.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622', marginBottom: 1 }}>{req.Books?.title}</div>
+                      <div style={{ fontSize: 12, color: '#A39B90' }}><strong style={{ color: '#6B5440' }}>{req.Users?.name}</strong> ביקש/ה לשאול</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
+                      <button onClick={() => declineRequest(req)} disabled={busyIncoming === req.id} style={{ border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#B24A3A', cursor: 'pointer' }}>
+                        דחה
+                      </button>
+                      <button onClick={() => handOverBook(req)} disabled={busyIncoming === req.id} style={{ border: 'none', background: '#C05A3E', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#F7F5F1', cursor: 'pointer' }}>
+                        {busyIncoming === req.id ? '…' : 'מסרתי את הספר'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+            }
+          </Section>
+
           {/* ── המדף שלי ── */}
           <Section title="המדף שלי" count={myBooks.length}>
             {myBooks.length === 0
@@ -161,13 +220,12 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
             }
           </Section>
 
-          {/* ── ספרים שאני שואל ── */}
-          <Section title="ספרים שאני שואל" count={borrows.length}>
-            {borrows.length === 0
-              ? <Empty>אין השאלות פעילות — בקש ספר כדי לראות אותו כאן.</Empty>
-              : borrows.map(b => {
+          {/* ── מבוקשים ── */}
+          <Section title="מבוקשים" count={requestedBorrows.length}>
+            {requestedBorrows.length === 0
+              ? <Empty>אין בקשות ממתינות — בקש ספר כדי לראות אותו כאן.</Empty>
+              : requestedBorrows.map(b => {
                   const book = b.Books
-                  const s = STATUS[book?.status] || STATUS.available
                   return (
                     <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -176,11 +234,33 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
                         <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>מהמדף של <strong style={{ color: '#6B5440' }}>{book?.Users?.name}</strong></div>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flex: 'none' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: s.color, background: s.bg, padding: '4px 8px', borderRadius: 999 }}>{s.label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#B8860B', background: '#F6EDD4', padding: '4px 8px', borderRadius: 999 }}>ממתין</span>
                         <button onClick={() => removeBorrow(b)} disabled={removingBorrow === b.id} style={{ border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#B24A3A', cursor: 'pointer' }}>
                           {removingBorrow === b.id ? '…' : 'הסר'}
                         </button>
                       </div>
+                    </div>
+                  )
+                })
+            }
+          </Section>
+
+          {/* ── מושאלים ── */}
+          <Section title="מושאלים" count={activeBorrows.length}>
+            {activeBorrows.length === 0
+              ? <Empty>אין ספרים בהשאלה כרגע.</Empty>
+              : activeBorrows.map(b => {
+                  const book = b.Books
+                  return (
+                    <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622', marginBottom: 1 }}>{book?.title}</div>
+                        <div style={{ fontSize: 12, color: '#7C756C' }}>מאת {book?.author}</div>
+                        <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>מהמדף של <strong style={{ color: '#6B5440' }}>{book?.Users?.name}</strong></div>
+                      </div>
+                      <button onClick={() => markReturned(b)} disabled={returningBorrow === b.id} style={{ flex: 'none', border: 'none', background: '#2E8B57', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#F7F5F1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {returningBorrow === b.id ? '…' : (<><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="3" strokeLinecap="round"><path d="M5 13l4 4L19 7" /></svg>הוחזר</>)}
+                      </button>
                     </div>
                   )
                 })

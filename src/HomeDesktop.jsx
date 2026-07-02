@@ -56,6 +56,10 @@ export default function HomeDesktop({ currentUser }) {
   const noMatch = filtered.length === 0 && !!q
 
   async function handleBorrow(book) {
+    await supabase.from('borrows').upsert(
+      { book_id: book.id, borrower_id: currentUser.id },
+      { onConflict: 'book_id,borrower_id' }
+    )
     await supabase.from('Notifications').insert({
       recipient_id: book.add_by,
       sender_id: currentUser.id,
@@ -85,6 +89,7 @@ export default function HomeDesktop({ currentUser }) {
     const msg = `שלום ${ownerName}! אשמח לשאול את הספר "${ab.title}" ממדף הספרייה המשפחתית שלך. האם הספר זמין? 📚`
     const phone = ab.Users?.phone?.replace(/\D/g, '')
     const email = ab.Users?.email
+    contactOptions.push({ key: 'inapp', icon: '🔔', label: 'הודעה בתוך האפליקציה', sub: 'הבעלים יקבל התראה ישירות', tint: 'rgba(192,90,62,.12)', go: () => handleBorrow(ab) })
     if (phone) {
       contactOptions.push({ key: 'wa', icon: '💬', label: 'WhatsApp', sub: ab.Users?.phone, tint: 'rgba(37,211,102,.12)', go: () => { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank'); handleBorrow(ab) } })
       contactOptions.push({ key: 'sms', icon: '📱', label: 'SMS', sub: ab.Users?.phone, tint: 'rgba(90,127,224,.12)', go: () => { window.open(`sms:${phone}?body=${encodeURIComponent(msg)}`, '_blank'); handleBorrow(ab) } })
