@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { STATUS, avatarPalette, initial } from './lib/utils'
-import BookCover from './BookCover'
+import { initial } from './lib/utils'
+import BookBoard from './BookBoard'
 import BookDetail from './BookDetail'
 import AddBook from './AddBook'
 import Profile from './Profile'
@@ -13,7 +13,6 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('user')
   const [activeBook, setActiveBook] = useState(null)
   const [editBook, setEditBook] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -43,36 +42,8 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
     !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)
   )
 
-  let groups = []
-  if (filter === 'user') {
-    const byUser = {}
-    filtered.forEach(b => {
-      const uid = b.add_by
-      if (!byUser[uid]) byUser[uid] = { name: b.Users?.name || 'Unknown', books: [] }
-      byUser[uid].books.push(b)
-    })
-    groups = Object.entries(byUser).map(([uid, g]) => {
-      const pal = avatarPalette(uid)
-      return { key: uid, title: g.name, count: g.books.length, avatarLabel: initial(g.name), avatarBg: pal.bg, avatarColor: pal.color, avatarRadius: '50%', books: g.books }
-    })
-  } else {
-    const byTopic = {}
-    filtered.forEach(b => { const t = b.topic || 'Other'; if (!byTopic[t]) byTopic[t] = []; byTopic[t].push(b) })
-    groups = Object.keys(byTopic).sort().map(t => ({
-      key: t, title: t, count: byTopic[t].length,
-      avatarLabel: t[0], avatarBg: '#F1ECE3', avatarColor: '#8A6A3A', avatarRadius: 9,
-      books: byTopic[t],
-    }))
-  }
-
-  const emptyShelf = groups.length === 0 && !q && !loading
-  const noMatch = groups.length === 0 && !!q
-
-  const pill = (on) => on
-    ? { bg: '#2C2622', color: '#F7F5F1', border: '#2C2622' }
-    : { bg: '#FFFFFF', color: '#6E675C', border: '#E7E1D6' }
-  const pu = pill(filter === 'user')
-  const pt = pill(filter === 'topic')
+  const emptyShelf = books.length === 0 && !q && !loading
+  const noMatch = filtered.length === 0 && !!q
 
   function handleBorrow(book) {
     showToast(`Request sent to ${book.Users?.name || 'the owner'}`)
@@ -126,64 +97,19 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
             style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }}
           />
         </div>
-
-        {/* filter pills */}
-        <div style={{ display: 'flex', gap: 9, marginTop: 13 }}>
-          <PillBtn onClick={() => setFilter('user')} pal={pu}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={pu.color} strokeWidth="2.2" strokeLinecap="round">
-              <circle cx="12" cy="8" r="4" /><path d="M5 20c0-3.3 3.1-6 7-6s7 2.7 7 6" />
-            </svg>
-            לפי משתמש
-          </PillBtn>
-          <PillBtn onClick={() => setFilter('topic')} pal={pt}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={pt.color} strokeWidth="2.2" strokeLinecap="round">
-              <path d="M4 5h16M4 12h16M4 19h10" />
-            </svg>
-            לפי נושא
-          </PillBtn>
-        </div>
       </div>
 
-      {/* feed */}
+      {/* board */}
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '8px 0 110px' }}>
         {loading && (
           <div style={{ textAlign: 'center', padding: '60px 30px', color: '#A39B90', fontSize: 15 }}>טוען…</div>
         )}
 
-        {!loading && groups.map(group => (
-          <div key={group.key} style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px 12px' }}>
-              <div style={{
-                width: 30, height: 30, borderRadius: group.avatarRadius,
-                background: group.avatarBg, color: group.avatarColor,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: 13, flex: 'none',
-              }}>
-                {group.avatarLabel}
-              </div>
-              <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 17, color: '#2C2622' }}>{group.title}</div>
-              <div style={{ fontSize: 13, color: '#A39B90', fontWeight: 500 }}>
-                {group.count} {group.count === 1 ? 'ספר' : 'ספרים'}
-              </div>
-            </div>
-            <div className="fl-scroll" style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '2px 20px 6px' }}>
-              {group.books.map(book => {
-                const s = STATUS[book.status] || STATUS.available
-                return (
-                  <div key={book.id} onClick={() => setActiveBook(book)}
-                    style={{ width: 128, flex: 'none', cursor: 'pointer' }}>
-                    <BookCover book={book} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9 }}>
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flex: 'none' }} />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{s.label}</span>
-                    </div>
-                    <div style={{ fontSize: 13, color: '#7C756C', marginTop: 1, lineHeight: 1.3 }}>{book.author}</div>
-                  </div>
-                )
-              })}
-            </div>
+        {!loading && filtered.length > 0 && (
+          <div style={{ padding: '2px 20px 6px' }}>
+            <BookBoard books={filtered} onBookClick={setActiveBook} />
           </div>
-        ))}
+        )}
 
         {/* rich empty state */}
         {emptyShelf && (
@@ -198,9 +124,9 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
               </svg>
             </div>
-            <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 23, color: '#2C2622', margin: '0 0 8px' }}>Your shelf is empty</h2>
+            <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 23, color: '#2C2622', margin: '0 0 8px' }}>המדף שלך ריק</h2>
             <p style={{ fontSize: 15, lineHeight: 1.55, color: '#7C756C', margin: '0 0 26px', maxWidth: 260 }}>
-              Add the first book and start sharing reads with your family and friends.
+              הוסף את הספר הראשון והתחל לשתף קריאה עם המשפחה והחברים.
             </p>
             <button onClick={() => setShowAdd(true)} style={{
               border: 'none', borderRadius: 14, padding: '14px 26px',
@@ -212,14 +138,14 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Add a book
+              הוסף ספר
             </button>
           </div>
         )}
 
         {noMatch && (
           <div style={{ textAlign: 'center', padding: '60px 30px', color: '#A39B90', fontSize: 15 }}>
-            No books match "{search}".
+            לא נמצאו ספרים התואמים ל"{search}".
           </div>
         )}
       </div>
@@ -253,20 +179,5 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
       )}
       <Toast message={toast} />
     </div>
-  )
-}
-
-function PillBtn({ onClick, pal, children }) {
-  return (
-    <button onClick={onClick} style={{
-      border: 'none', cursor: 'pointer',
-      fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 14,
-      padding: '8px 16px', borderRadius: 999,
-      background: pal.bg, color: pal.color,
-      borderStyle: 'solid', borderWidth: 1.5, borderColor: pal.border,
-      display: 'flex', alignItems: 'center', gap: 6,
-    }}>
-      {children}
-    </button>
   )
 }

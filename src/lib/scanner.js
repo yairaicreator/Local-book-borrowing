@@ -111,13 +111,11 @@ function bookInfoToResult(info) {
 }
 
 const TOPIC_MAP = {
-  Fiction: ['fiction', 'novel', 'fantasy', 'adventure', 'science fiction'],
-  Thriller: ['thriller', 'mystery', 'crime', 'detective', 'suspense', 'horror'],
-  Romance: ['romance', 'love story'],
-  Biography: ['biography', 'autobiography', 'memoir'],
-  Science: ['science', 'physics', 'biology', 'chemistry', 'technology', 'mathematics', 'astronomy'],
-  History: ['history', 'historical'],
-  'Non-fiction': ['self-help', 'business', 'psychology', 'philosophy', 'economics', 'politics', 'health', 'cooking', 'religion', 'education'],
+  'ישראלי': ['hebrew', 'israeli', 'israel'],
+  'מתח': ['thriller', 'mystery', 'crime', 'detective', 'suspense', 'horror'],
+  'רומנטיקה': ['romance', 'love story'],
+  'דרמה': ['fiction', 'novel', 'fantasy', 'adventure', 'science fiction', 'drama', 'biography', 'autobiography', 'memoir'],
+  'אחר': ['science', 'physics', 'biology', 'chemistry', 'technology', 'mathematics', 'astronomy', 'history', 'historical', 'self-help', 'business', 'psychology', 'philosophy', 'economics', 'politics', 'health', 'cooking', 'religion', 'education'],
 }
 
 function mapCategory(categories) {
@@ -257,12 +255,14 @@ Then on the very last line write the genre.
 
 Output format:
 <all the text from the back cover, copied exactly>
-TOPIC: Fiction
+TOPIC: דרמה
 
-Replace "Fiction" with one of: Fiction, Thriller, Romance, Biography, Science, History, Non-fiction, Other.
+Replace "דרמה" with one of these exact Hebrew words: דרמה, ישראלי, מתח, רומנטיקה, אחר.
+Use "ישראלי" if the book is Israeli fiction / by an Israeli author. Use "מתח" for thriller/mystery/suspense.
+Use "רומנטיקה" for romance. Use "דרמה" for general fiction/drama. Use "אחר" for anything else (non-fiction, biography, science, history, etc).
 Do NOT summarize. Do NOT add labels or commentary. Just copy all the text and end with the TOPIC line.`
 
-const TOPICS_LIST = ['Fiction','Thriller','Romance','Biography','Science','History','Non-fiction','Other']
+const TOPICS_LIST = ['דרמה','ישראלי','מתח','רומנטיקה','אחר']
 
 export async function analyzeBackCoverWithGemini(file) {
   const base64 = await fileToBase64(file)
@@ -405,13 +405,11 @@ export function textToLines(text) {
 export function detectTopic(text) {
   const lower = text.toLowerCase()
   const KEYWORDS = {
-    Thriller: ['murder','detective','crime','thriller','mystery','killer','suspense','spy'],
-    Romance: ['romance','love','heart','passion','kiss','desire','wedding'],
-    Biography: ['memoir','biography','autobiography','life of'],
-    Science: ['science','physics','biology','chemistry','technology','quantum','astronomy'],
-    History: ['history','historical','war','century','empire','ancient','revolution'],
-    'Non-fiction': ['guide','how to','self-help','business','leadership','success','habits'],
-    Fiction: ['novel','fiction','adventure','quest','journey','magic','fantasy','dragon'],
+    'מתח': ['murder','detective','crime','thriller','mystery','killer','suspense','spy'],
+    'רומנטיקה': ['romance','love','heart','passion','kiss','desire','wedding'],
+    'ישראלי': ['hebrew','israeli','israel'],
+    'אחר': ['memoir','biography','autobiography','life of','science','physics','biology','chemistry','technology','quantum','astronomy','history','historical','war','century','empire','ancient','revolution','guide','how to','self-help','business','leadership','success','habits'],
+    'דרמה': ['novel','fiction','adventure','quest','journey','magic','fantasy','dragon'],
   }
   let best = null, bestScore = 0
   for (const [topic, kws] of Object.entries(KEYWORDS)) {

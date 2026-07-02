@@ -46,9 +46,8 @@ export const STATUS = {
   unavailable: { label: 'לא זמין', color: '#B24A3A', bg: '#F4E2DD' },
 }
 
-export const TOPICS = ['Fiction', 'Romance', 'Novel', 'Non-fiction', 'Thriller', 'Biography', 'Science', 'History', 'Other']
+export const TOPICS = ['דרמה', 'ישראלי', 'מתח', 'רומנטיקה', 'אחר']
 
-export const TOPIC_LABELS = {
-  Fiction: 'פיקציה', Romance: 'רומן', Novel: 'רומן', 'Non-fiction': 'עיון',
-  Thriller: 'מתח', Biography: 'ביוגרפיה', Science: 'מדע', History: 'היסטוריה', Other: 'אחר',
-}
+// Topic values are stored in Hebrew directly, so no translation map is needed —
+// kept as an identity fallback for any legacy/unmapped value.
+export const TOPIC_LABELS = TOPICS.reduce((m, t) => ({ ...m, [t]: t }), {})

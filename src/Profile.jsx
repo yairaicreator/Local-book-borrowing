@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, avatarPalette, initial } from './lib/utils'
-import BookCover from './BookCover'
 import AddToReadingList from './AddToReadingList'
 
 export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) {
@@ -141,29 +140,24 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
           <Section title="המדף שלי" count={myBooks.length}>
             {myBooks.length === 0
               ? <Empty>עדיין לא הוספת ספרים.</Empty>
-              : (
-                <div className="fl-scroll" style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 0 6px' }}>
-                  {myBooks.map(book => {
-                    const s = STATUS[book.status] || STATUS.available
-                    return (
-                      <div key={book.id} style={{ flex: 'none', width: 100 }}>
-                        <BookCover book={book} width={100} height={142} fontSize={13} authorSize={9} />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flex: 'none' }} />
-                          <span style={{ fontSize: 11, fontWeight: 600, color: s.color }}>{s.label}</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: '#7C756C', marginTop: 1, lineHeight: 1.3, marginBottom: 6 }}>{book.title}</div>
-                        {onEdit && (
-                          <button onClick={() => { onEdit(book); onClose() }} style={{ width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 8, padding: '5px 0', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                            ערוך
-                          </button>
-                        )}
+              : myBooks.map(book => {
+                  const s = STATUS[book.status] || STATUS.available
+                  return (
+                    <div key={book.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flex: 'none' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622' }}>{book.title} <span style={{ fontWeight: 400, color: '#A39B90' }}>— {book.author}</span></div>
+                        <div style={{ fontSize: 12, color: s.color, marginTop: 2 }}>{s.label}</div>
                       </div>
-                    )
-                  })}
-                </div>
-              )
+                      {onEdit && (
+                        <button onClick={() => { onEdit(book); onClose() }} style={{ flex: 'none', border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                          ערוך
+                        </button>
+                      )}
+                    </div>
+                  )
+                })
             }
           </Section>
 
@@ -176,7 +170,6 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
                   const s = STATUS[book?.status] || STATUS.available
                   return (
                     <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
-                      <BookCover book={book || {}} width={48} height={68} fontSize={9} authorSize={7} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622', marginBottom: 1 }}>{book?.title}</div>
                         <div style={{ fontSize: 12, color: '#7C756C' }}>מאת {book?.author}</div>
@@ -210,13 +203,11 @@ export default function Profile({ currentUser, onClose, onEdit, onUserUpdate }) 
                   const title = book?.title || item.custom_title
                   const author = book?.author || item.custom_author
                   const source = book?.Users?.name ? `מהמדף של ${book.Users.name}` : 'ספר מותאם'
-                  const coverBook = book || { id: item.id, title: item.custom_title, author: item.custom_author, image_url: item.custom_image_url }
                   return (
                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #ECE7DE' }}>
                       <button onClick={() => toggleRead(item)} style={{ width: 26, height: 26, borderRadius: 8, flex: 'none', border: `2px solid ${item.is_read ? '#2E8B57' : '#DDD6CA'}`, background: item.is_read ? '#2E8B57' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {item.is_read && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M5 13l4 4L19 7" /></svg>}
                       </button>
-                      <BookCover book={coverBook} width={48} height={68} fontSize={9} authorSize={7} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: item.is_read ? '#A39B90' : '#2C2622', textDecoration: item.is_read ? 'line-through' : 'none', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
                         {author && <div style={{ fontSize: 12, color: '#7C756C' }}>מאת {author}</div>}

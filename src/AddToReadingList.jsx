@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './lib/supabase'
-import { TOPICS, STATUS, coverPalette } from './lib/utils'
-import BookCover from './BookCover'
+import { TOPICS, STATUS } from './lib/utils'
 
 export default function AddToReadingList({ currentUser, existingBookIds, onAdded, onClose }) {
   const [tab, setTab] = useState('browse') // 'browse' | 'custom'
@@ -166,7 +165,7 @@ export default function AddToReadingList({ currentUser, existingBookIds, onAdded
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '11px 0', borderBottom: '1px solid #ECE7DE',
                   }}>
-                    <BookCover book={book} width={44} height={62} fontSize={9} authorSize={7} />
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flex: 'none' }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622', marginBottom: 1 }}>{book.title}</div>
                       <div style={{ fontSize: 12, color: '#7C756C' }}>by {book.author}</div>
