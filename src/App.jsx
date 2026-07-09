@@ -64,7 +64,7 @@ export default function App() {
   }
 
   if (isDesktop) {
-    return <HomeDesktop currentUser={user} />
+    return <HomeDesktop currentUser={user} onUserUpdate={setUser} />
   }
 
   return (

@@ -8,7 +8,8 @@ import Profile from './Profile'
 import Toast from './Toast'
 import NotificationBell from './NotificationBell'
 
-export default function HomeDesktop({ currentUser }) {
+export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) {
+  const [currentUser, setCurrentUser] = useState(initialUser)
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -26,6 +27,11 @@ export default function HomeDesktop({ currentUser }) {
     clearTimeout(toastRef.current)
     toastRef.current = setTimeout(() => setToast(''), 1900)
   }, [])
+
+  function handleLogout() {
+    localStorage.removeItem('fl_user')
+    onUserUpdate?.(null)
+  }
 
   const fetchBooks = useCallback(async () => {
     const { data } = await supabase.from('Books').select('*, Users(id, name, phone, email)').order('created_at')
@@ -281,7 +287,10 @@ export default function HomeDesktop({ currentUser }) {
       {/* ── Profile overlay ── */}
       {showProfile && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
-          <Profile currentUser={currentUser} onClose={() => setShowProfile(false)} />
+          <Profile currentUser={currentUser} onClose={() => setShowProfile(false)}
+            onEdit={b => { setShowProfile(false); setEditBook(b) }}
+            onUserUpdate={u => { setCurrentUser(u); onUserUpdate?.(u) }}
+            onLogout={handleLogout} />
         </div>
       )}
 

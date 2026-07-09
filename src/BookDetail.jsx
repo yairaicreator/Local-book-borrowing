@@ -9,12 +9,21 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
   const [rlLoading, setRlLoading] = useState(false)
   const [showBack, setShowBack] = useState(false)
   const [notifSent, setNotifSent] = useState(false)
+  const [showRecommend, setShowRecommend] = useState(false)
+  const [recommendTarget, setRecommendTarget] = useState(null)
+  const [recommendSent, setRecommendSent] = useState(false)
+  const [friends, setFriends] = useState([])
 
   useEffect(() => {
     supabase.from('reading_list')
       .select('id').eq('user_id', currentUser.id).eq('book_id', book.id).maybeSingle()
       .then(({ data }) => setInReadingList(!!data))
   }, [book.id])
+
+  useEffect(() => {
+    supabase.from('Users').select('id, name, phone, email').neq('id', currentUser.id).order('name')
+      .then(({ data }) => setFriends(data || []))
+  }, [currentUser.id])
 
   const s = STATUS[book.status] || STATUS.available
   const ownerPal = avatarPalette(book.add_by)
@@ -87,6 +96,28 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
   function openEmail() {
     tapLink(`mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`)
     recordBorrow(); setShowContact(false)
+  }
+
+  function openRecommend() { setShowRecommend(true); setRecommendTarget(null); setRecommendSent(false) }
+  function closeRecommend() { setShowRecommend(false); setRecommendTarget(null); setRecommendSent(false) }
+
+  async function sendRecommend(friend, via) {
+    const msg = `היי ${friend.name}! חשבתי שתאהב/י את "${book.title}" מאת ${book.author} — תבדוק/י בספריית המשפחה שלנו! 📚`
+    await supabase.from('Notifications').insert({
+      recipient_id: friend.id,
+      sender_id: currentUser.id,
+      book_id: book.id,
+      message: `${currentUser.name || 'מישהו'} המליץ/ה לך על "${book.title}"`,
+    })
+    if (via === 'whatsapp' && friend.phone) {
+      tapLink(`https://wa.me/${formatWaPhone(friend.phone)}?text=${encodeURIComponent(msg)}`)
+    } else if (via === 'sms' && friend.phone) {
+      tapLink(`sms:${friend.phone}&body=${encodeURIComponent(msg)}`)
+    } else if (via === 'email' && friend.email) {
+      tapLink(`mailto:${friend.email}?subject=${encodeURIComponent('ספר שכדאי לך להכיר')}&body=${encodeURIComponent(msg)}`)
+    }
+    setRecommendSent(true)
+    setTimeout(closeRecommend, 1400)
   }
 
   async function toggleReadingList() {
@@ -172,7 +203,14 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
           <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 27, lineHeight: 1.15, color: '#2C2622', margin: '0 0 5px' }}>
             {book.title}
           </h2>
-          <div style={{ fontSize: 16, color: '#7C756C', marginBottom: 18 }}>מאת {book.author}</div>
+          <div style={{ fontSize: 16, color: '#7C756C', marginBottom: 14 }}>מאת {book.author}</div>
+
+          {friends.length > 0 && (
+            <button onClick={openRecommend} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 999, padding: '8px 14px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13, color: '#6E675C', cursor: 'pointer', marginBottom: 18 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+              המלץ לחבר
+            </button>
+          )}
 
           {book.description && (
             <p style={{ fontSize: 16, lineHeight: 1.6, color: '#4A443D', margin: '0 0 18px' }}>{book.description}</p>
@@ -297,6 +335,73 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
                 }}>ביטול</button>
               </>
             )}
+          </div>
+        </>
+      )}
+
+      {showRecommend && (
+        <>
+          <div onClick={closeRecommend} style={{
+            position: 'absolute', inset: 0, background: 'rgba(40,30,18,.5)', zIndex: 40,
+            animation: 'flFade .15s ease',
+          }} />
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            background: '#F7F5F1', borderRadius: '26px 26px 0 0',
+            zIndex: 41, padding: '22px 24px 36px',
+            animation: 'flSheetUp .28s cubic-bezier(.22,1,.36,1)',
+            boxShadow: '0 -12px 32px -12px rgba(40,30,18,.4)',
+          }}>
+            <div style={{ width: 38, height: 5, borderRadius: 3, background: '#DDD6CA', margin: '0 auto 20px' }} />
+
+            {recommendSent ? (
+              <div style={{ textAlign: 'center', padding: '20px 0 10px' }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>💌</div>
+                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>ההמלצה נשלחה!</div>
+                <div style={{ fontSize: 14, color: '#7C756C' }}>{recommendTarget?.name} יראה/תראה את ההמלצה שלך.</div>
+              </div>
+            ) : recommendTarget ? (
+              <>
+                <button onClick={() => setRecommendTarget(null)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', padding: 0, marginBottom: 12, cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontSize: 13, fontWeight: 600, color: '#A39B90' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="M15 5l-7 7 7 7" /></svg>
+                  חזרה
+                </button>
+                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>
+                  שליחה אל {recommendTarget.name}
+                </div>
+                <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>
+                  המלצה על "{book.title}" עבור {recommendTarget.name}:
+                </div>
+                <ContactBtn icon="🔔" label="הודעה בתוך האפליקציה" sub="יראה/תראה את ההמלצה שלך" onClick={() => sendRecommend(recommendTarget, 'inapp')} color="#C05A3E" />
+                {recommendTarget.phone ? (<>
+                  <ContactBtn icon="💬" label="WhatsApp" sub={recommendTarget.phone} onClick={() => sendRecommend(recommendTarget, 'whatsapp')} color="#25D366" />
+                  <ContactBtn icon="📱" label="SMS" sub={recommendTarget.phone} onClick={() => sendRecommend(recommendTarget, 'sms')} color="#5A7FE0" />
+                </>) : null}
+                {recommendTarget.email ? (
+                  <ContactBtn icon="✉️" label="אימייל" sub={recommendTarget.email} onClick={() => sendRecommend(recommendTarget, 'email')} color="#C05A3E" />
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>המלץ לחבר</div>
+                <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>
+                  למי כדאי לספר על "{book.title}"?
+                </div>
+                {friends.map(f => (
+                  <button key={f.id} onClick={() => setRecommendTarget(f)} style={{ width: '100%', border: '1.5px solid #ECE7DE', background: '#FFFFFF', borderRadius: 14, padding: '12px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarPalette(f.id).bg, color: avatarPalette(f.id).color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flex: 'none' }}>{initial(f.name)}</div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622' }}>{f.name}</div>
+                    <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
+                  </button>
+                ))}
+              </>
+            )}
+            <button onClick={closeRecommend} style={{
+              marginTop: 10, width: '100%', border: '1.5px solid #E7E1D6',
+              background: 'transparent', borderRadius: 14, padding: 14,
+              fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16,
+              color: '#6E675C', cursor: 'pointer',
+            }}>ביטול</button>
           </div>
         </>
       )}
