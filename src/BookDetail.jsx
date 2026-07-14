@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import BookCover from './BookCover'
 import { STATUS, TOPIC_LABELS, avatarPalette, initial } from './lib/utils'
 import { supabase } from './lib/supabase'
@@ -13,6 +13,8 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
   const [recommendTarget, setRecommendTarget] = useState(null)
   const [recommendSent, setRecommendSent] = useState(false)
   const [friends, setFriends] = useState([])
+  const [queue, setQueue] = useState([])
+  const [joining, setJoining] = useState(false)
 
   useEffect(() => {
     supabase.from('reading_list')
@@ -25,45 +27,83 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
       .then(({ data }) => setFriends(data || []))
   }, [currentUser.id])
 
+  const fetchQueue = useCallback(async () => {
+    const { data } = await supabase.from('borrows')
+      .select('id, borrower_id, status, created_at, Users!borrower_id(name)')
+      .eq('book_id', book.id).order('created_at')
+    setQueue(data || [])
+  }, [book.id])
+
+  useEffect(() => { fetchQueue() }, [fetchQueue])
+
   const s = STATUS[book.status] || STATUS.available
   const ownerPal = avatarPalette(book.add_by)
-  const isAvail = book.status === 'available'
   const isOwnBook = book.add_by === currentUser.id
 
+  const waitlistOnly = queue.filter(q => q.status === 'waitlisted')
+  const activeRow = queue.find(q => q.status === 'requested' || q.status === 'borrowed')
+  const myRow = queue.find(q => q.borrower_id === currentUser.id)
+  const myWaitlistPos = myRow?.status === 'waitlisted' ? waitlistOnly.findIndex(q => q.id === myRow.id) + 1 : null
+
   let holderLabel, holderName
-  if (book.status === 'borrowed') {
-    holderLabel = 'מושאל כרגע על ידי'
-    holderName = book.borrowed_by_name || '—'
-  } else if (book.status === 'unavailable') {
+  if (book.status === 'unavailable') {
     holderLabel = 'נמצא אצל'
     holderName = (book.Users?.name || 'בעלים') + ' · לא להשאלה'
+  } else if (activeRow) {
+    holderLabel = activeRow.status === 'borrowed' ? 'מושאל כרגע על ידי' : 'מבוקש כרגע על ידי'
+    holderName = activeRow.Users?.name || '—'
   } else {
     holderLabel = 'על המדף של'
     holderName = book.Users?.name || 'לא ידוע'
   }
 
-  const canBorrow = !isOwnBook && isAvail
+  const canRequest = !isOwnBook && book.status === 'available' && !myRow
+  const canJoinWaitlist = !isOwnBook && book.status === 'borrowed' && !myRow
+  const myStatusLabel = !isOwnBook && myRow
+    ? (myRow.status === 'requested' ? 'הבקשה שלך ממתינה לאישור הבעלים'
+      : myRow.status === 'borrowed' ? 'הספר אצלך כרגע'
+      : `במקום ${myWaitlistPos} בתור`)
+    : null
+
   const ownerName = book.Users?.name || 'הבעלים'
   const msgText = `שלום ${ownerName}! אשמח לשאול את הספר "${book.title}" ממדף הספרייה המשפחתית שלך. האם הספר זמין? 📚`
   const ownerPhone = book.Users?.phone?.replace(/\D/g, '')
   const ownerEmail = book.Users?.email
 
-  async function recordBorrow() {
+  async function requestBorrow() {
     await supabase.from('borrows').upsert(
-      { book_id: book.id, borrower_id: currentUser.id },
+      { book_id: book.id, borrower_id: currentUser.id, status: 'requested' },
       { onConflict: 'book_id,borrower_id' }
     )
+    await supabase.from('Books').update({ status: 'borrowed' }).eq('id', book.id)
     await supabase.from('Notifications').insert({
       recipient_id: book.add_by,
       sender_id: currentUser.id,
       book_id: book.id,
       message: `${currentUser.name || 'מישהו'} ביקש לשאול את "${book.title}"`,
     })
+    fetchQueue()
     onBorrow(book)
   }
 
+  async function joinWaitlist() {
+    setJoining(true)
+    await supabase.from('borrows').upsert(
+      { book_id: book.id, borrower_id: currentUser.id, status: 'waitlisted' },
+      { onConflict: 'book_id,borrower_id' }
+    )
+    await supabase.from('Notifications').insert({
+      recipient_id: book.add_by,
+      sender_id: currentUser.id,
+      book_id: book.id,
+      message: `${currentUser.name || 'מישהו'} הצטרף/ה לרשימת ההמתנה עבור "${book.title}"`,
+    })
+    await fetchQueue()
+    setJoining(false)
+  }
+
   async function sendInAppNotification() {
-    await recordBorrow()
+    await requestBorrow()
     setNotifSent(true)
     setTimeout(() => { setShowContact(false); setNotifSent(false) }, 1400)
   }
@@ -87,15 +127,15 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
   }
   function openWhatsApp() {
     tapLink(`https://wa.me/${formatWaPhone(ownerPhone)}?text=${encodeURIComponent(msgText)}`)
-    recordBorrow(); setShowContact(false)
+    requestBorrow(); setShowContact(false)
   }
   function openSMS() {
     tapLink(`sms:${ownerPhone}&body=${encodeURIComponent(msgText)}`)
-    recordBorrow(); setShowContact(false)
+    requestBorrow(); setShowContact(false)
   }
   function openEmail() {
     tapLink(`mailto:${ownerEmail}?subject=${encodeURIComponent(`בקשת השאלת ספר: ${book.title}`)}&body=${encodeURIComponent(msgText)}`)
-    recordBorrow(); setShowContact(false)
+    requestBorrow(); setShowContact(false)
   }
 
   function openRecommend() { setShowRecommend(true); setRecommendTarget(null); setRecommendSent(false) }
@@ -175,7 +215,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
             )}
           </div>
 
-          {/* status + topic + borrow button row */}
+          {/* status + topic + borrow/waitlist/status row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{
               fontSize: 13, fontWeight: 600, color: s.color, background: s.bg,
@@ -188,7 +228,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
                 {TOPIC_LABELS[book.topic] || book.topic}
               </span>
             )}
-            {canBorrow && (
+            {canRequest && (
               <button onClick={() => setShowContact(true)} style={{
                 marginRight: 'auto', border: 'none', borderRadius: 999, padding: '7px 16px',
                 background: '#C05A3E', color: '#F7F5F1', fontFamily: "'Source Sans 3',sans-serif",
@@ -197,6 +237,21 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
                 בקש להשאיל
               </button>
+            )}
+            {canJoinWaitlist && (
+              <button onClick={joinWaitlist} disabled={joining} style={{
+                marginRight: 'auto', border: '1.5px solid #C05A3E', borderRadius: 999, padding: '7px 16px',
+                background: '#FBF0EB', color: '#C05A3E', fontFamily: "'Source Sans 3',sans-serif",
+                fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+                {joining ? 'מצטרף/ת…' : 'הצטרף/י לרשימת המתנה'}
+              </button>
+            )}
+            {myStatusLabel && (
+              <span style={{ marginRight: 'auto', fontSize: 13, fontWeight: 600, color: '#8A6A3A', background: '#F3ECDD', padding: '7px 14px', borderRadius: 999 }}>
+                {myStatusLabel}
+              </span>
             )}
           </div>
 
@@ -249,6 +304,29 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
               </svg>
               {inReadingList ? 'נשמר לרשימת הקריאה' : 'הוסף לרשימת הקריאה'}
             </button>
+          )}
+
+          {isOwnBook && queue.length > 0 && (
+            <div style={{ marginTop: 10, paddingTop: 18, borderTop: '1px solid #ECE7DE' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#A39B90', marginBottom: 10 }}>רשימת המתנה</div>
+              {queue.map((q, i) => {
+                const pal = avatarPalette(q.borrower_id)
+                const label = q.status === 'borrowed' ? 'מחזיק/ה כרגע'
+                  : q.status === 'requested' ? 'ממתין/ה לאישורך'
+                  : `מקום ${waitlistOnly.findIndex(w => w.id === q.id) + 1} בתור`
+                return (
+                  <div key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderBottom: i < queue.length - 1 ? '1px solid #ECE7DE' : 'none' }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: pal.bg, color: pal.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, flex: 'none' }}>
+                      {initial(q.Users?.name)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#2C2622' }}>{q.Users?.name}</div>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: '#8A6A3A', fontWeight: 600, flex: 'none' }}>{label}</div>
+                  </div>
+                )
+              })}
+            </div>
           )}
 
           {isOwnBook && onEdit && (

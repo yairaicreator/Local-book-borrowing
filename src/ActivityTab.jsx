@@ -13,6 +13,7 @@ function timeAgo(ts) {
 export default function ActivityTab({ currentUser, onOpenBook }) {
   const [incoming, setIncoming] = useState([])
   const [borrows, setBorrows] = useState([])
+  const [allWaitlisted, setAllWaitlisted] = useState([])
   const [readingList, setReadingList] = useState([])
   const [recent, setRecent] = useState([])
   const [loading, setLoading] = useState(true)
@@ -24,17 +25,38 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [incomingRes, borrowsRes, rlRes, recentRes] = await Promise.all([
+    const [incomingRes, borrowsRes, waitlistRes, rlRes, recentRes] = await Promise.all([
       supabase.from('borrows').select('*, Books!inner(id, title, author, add_by), Users!borrower_id(name)').eq('Books.add_by', currentUser.id).eq('status', 'requested').order('created_at', { ascending: false }),
       supabase.from('borrows').select('*, Books(*, Users(name))').eq('borrower_id', currentUser.id).order('created_at', { ascending: false }),
+      supabase.from('borrows').select('id, book_id, created_at').eq('status', 'waitlisted').order('created_at'),
       supabase.from('reading_list').select('*, Books(*, Users(name))').eq('user_id', currentUser.id).order('created_at'),
       supabase.from('Notifications').select('id, message, created_at').eq('recipient_id', currentUser.id).order('created_at', { ascending: false }).limit(20),
     ])
     setIncoming(incomingRes.data || [])
     setBorrows(borrowsRes.data || [])
+    setAllWaitlisted(waitlistRes.data || [])
     setReadingList(rlRes.data || [])
     setRecent(recentRes.data || [])
     setLoading(false)
+  }
+
+  // When a book's active claim goes away (return / decline / self-cancel), promote
+  // the next waitlisted person, or free the book back to available if the queue is empty.
+  async function releaseOrPromote(bookId) {
+    const { data: nextUp } = await supabase.from('borrows')
+      .select('id, borrower_id, Books(title, add_by)')
+      .eq('book_id', bookId).eq('status', 'waitlisted')
+      .order('created_at', { ascending: true }).limit(1).maybeSingle()
+    if (nextUp) {
+      await supabase.from('borrows').update({ status: 'requested' }).eq('id', nextUp.id)
+      const title = nextUp.Books?.title
+      await supabase.from('Notifications').insert([
+        { recipient_id: nextUp.borrower_id, book_id: bookId, message: `הספר "${title}" פנוי בשבילך עכשיו! מתאם/ת מסירה עם הבעלים.` },
+        { recipient_id: nextUp.Books?.add_by, sender_id: nextUp.borrower_id, book_id: bookId, message: `התור הבא ל"${title}" ממתין למסירה.` },
+      ])
+    } else {
+      await supabase.from('Books').update({ status: 'available' }).eq('id', bookId)
+    }
   }
 
   async function handOverBook(req) {
@@ -47,6 +69,7 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
   async function declineRequest(req) {
     setBusyIncoming(req.id)
     await supabase.from('borrows').delete().eq('id', req.id)
+    await releaseOrPromote(req.book_id)
     setIncoming(prev => prev.filter(r => r.id !== req.id))
     setBusyIncoming(null)
   }
@@ -54,6 +77,7 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
   async function removeBorrow(b) {
     setRemovingBorrow(b.id)
     await supabase.from('borrows').delete().eq('id', b.id)
+    if (b.status === 'requested') await releaseOrPromote(b.book_id)
     setBorrows(prev => prev.filter(r => r.id !== b.id))
     setRemovingBorrow(null)
   }
@@ -66,6 +90,7 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
         { user_id: currentUser.id, book_id: b.book_id, is_read: true },
         { onConflict: 'user_id,book_id' }
       )
+      await releaseOrPromote(b.book_id)
     }
     setBorrows(prev => prev.filter(r => r.id !== b.id))
     const { data } = await supabase.from('reading_list').select('*, Books(*, Users(name))').eq('user_id', currentUser.id).order('created_at')
@@ -88,6 +113,11 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
     setShowAddRL(false)
     const { data } = await supabase.from('reading_list').select('*, Books(*, Users(name))').eq('user_id', currentUser.id).order('created_at')
     setReadingList(data || [])
+  }
+
+  function waitlistPosition(b) {
+    const siblings = allWaitlisted.filter(w => w.book_id === b.book_id)
+    return siblings.findIndex(w => w.id === b.id) + 1
   }
 
   const requestedBorrows = borrows.filter(b => b.status !== 'borrowed')
@@ -140,7 +170,9 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
                       <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>מהמדף של <strong style={{ color: '#6B5440' }}>{b.Books?.Users?.name}</strong></div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flex: 'none' }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#B8860B', background: '#F6EDD4', padding: '4px 8px', borderRadius: 999 }}>ממתין</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#B8860B', background: '#F6EDD4', padding: '4px 8px', borderRadius: 999 }}>
+                        {b.status === 'waitlisted' ? `מקום ${waitlistPosition(b)} בתור` : 'ממתין לאישור הבעלים'}
+                      </span>
                       <button onClick={e => { e.stopPropagation(); removeBorrow(b) }} disabled={removingBorrow === b.id} style={{ border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#B24A3A', cursor: 'pointer' }}>
                         {removingBorrow === b.id ? '…' : 'הסר'}
                       </button>
