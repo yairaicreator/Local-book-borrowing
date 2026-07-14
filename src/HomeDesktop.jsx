@@ -2,22 +2,42 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase'
 import { STATUS, TOPIC_LABELS, avatarPalette, initial } from './lib/utils'
 import BookCover from './BookCover'
-import BookBoard from './BookBoard'
+import HomeTabDesktop from './HomeTabDesktop'
+import ShelfTabDesktop from './ShelfTabDesktop'
+import MembersTabDesktop from './MembersTabDesktop'
+import ActivityTabDesktop from './ActivityTabDesktop'
 import AddBook from './AddBook'
 import Profile from './Profile'
 import Toast from './Toast'
 import NotificationBell from './NotificationBell'
 
+const SHARE_URL = 'https://local-book-borrowing.vercel.app/'
+
+const TABS = [
+  { key: 'home', label: 'בית', icon: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /></> },
+  { key: 'shelf', label: 'המדף שלי', icon: <><path d="M2 5.5C2 4.7 2.7 4 3.5 4H10a2 2 0 0 1 2 2v14.5C12 19.3 10.8 18 9 18H2z" /><path d="M22 5.5c0-.8-.7-1.5-1.5-1.5H14a2 2 0 0 0-2 2v14.5c0-1.2 1.2-2.5 3-2.5h7z" /></> },
+  { key: 'members', label: 'חברים', icon: <><circle cx="9" cy="7" r="3" /><path d="M2 20c0-2.8 2.7-5 6-5" /><circle cx="17" cy="7" r="3" /><path d="M13 20c0-3 2.7-5 6-5s6 2 6 5" /></> },
+  { key: 'activity', label: 'פעילות', icon: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></> },
+]
+
+const TAB_TITLES = { home: 'הספרייה שלך', shelf: 'המדף שלי', members: 'חברים', activity: 'פעילות' }
+
 export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) {
   const [currentUser, setCurrentUser] = useState(initialUser)
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('home')
   const [search, setSearch] = useState('')
   const [activeBook, setActiveBook] = useState(null)
   const [showBack, setShowBack] = useState(false)
   const [editBook, setEditBook] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [showContact, setShowContact] = useState(false)
+  const [showRecommend, setShowRecommend] = useState(false)
+  const [recommendTarget, setRecommendTarget] = useState(null)
+  const [recommendSent, setRecommendSent] = useState(false)
+  const [friends, setFriends] = useState([])
+  const [inReadingList, setInReadingList] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [toast, setToast] = useState('')
   const toastRef = { current: null }
@@ -33,6 +53,16 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
     onUserUpdate?.(null)
   }
 
+  function handleShare() {
+    if (navigator.share) {
+      navigator.share({ title: 'Family Library', text: 'הצטרפו לספרייה המשפחתית שלנו!', url: SHARE_URL }).catch(() => {})
+    } else if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(SHARE_URL).then(() => showToast('הקישור הועתק')).catch(() => showToast(SHARE_URL))
+    } else {
+      showToast(SHARE_URL)
+    }
+  }
+
   const fetchBooks = useCallback(async () => {
     const { data } = await supabase.from('Books').select('*, Users(id, name, phone, email)').order('created_at')
     setBooks(data || [])
@@ -41,25 +71,30 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
 
   useEffect(() => { fetchBooks() }, [fetchBooks])
 
-  const q = search.trim().toLowerCase()
-  const filtered = books.filter(b => !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q))
+  useEffect(() => {
+    supabase.from('Users').select('id, name, phone, email').neq('id', currentUser.id).order('name')
+      .then(({ data }) => setFriends(data || []))
+  }, [currentUser.id])
 
-  const shelfNav = []
-  {
-    const byUser = {}
-    books.forEach(b => {
-      const uid = b.add_by
-      if (!byUser[uid]) byUser[uid] = { name: b.Users?.name || 'Unknown', allCount: 0 }
-      byUser[uid].allCount++
-    })
-    Object.entries(byUser).forEach(([uid, g]) => {
-      const pal = avatarPalette(uid)
-      shelfNav.push({ key: uid, name: g.name, count: g.allCount, label: initial(g.name), bg: pal.bg, color: pal.color, radius: '50%' })
-    })
+  useEffect(() => {
+    if (!activeBook) return
+    supabase.from('reading_list').select('id').eq('user_id', currentUser.id).eq('book_id', activeBook.id).maybeSingle()
+      .then(({ data }) => setInReadingList(!!data))
+  }, [activeBook, currentUser.id])
+
+  function openBook(book) {
+    const full = books.find(b => b.id === book.id) || book
+    setActiveBook(full)
+    setShowBack(false)
   }
 
-  const emptyShelf = books.length === 0 && !q && !loading
-  const noMatch = filtered.length === 0 && !!q
+  function closeBook() {
+    setActiveBook(null)
+    setShowContact(false)
+    setShowRecommend(false)
+    setRecommendTarget(null)
+    setRecommendSent(false)
+  }
 
   async function handleBorrow(book) {
     await supabase.from('borrows').upsert(
@@ -74,6 +109,42 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
     })
     showToast(`הבקשה נשלחה לבעלים`)
     setActiveBook(null)
+  }
+
+  async function toggleReadingList() {
+    if (!activeBook) return
+    if (inReadingList) {
+      await supabase.from('reading_list').delete().eq('user_id', currentUser.id).eq('book_id', activeBook.id)
+      setInReadingList(false)
+    } else {
+      await supabase.from('reading_list').upsert(
+        { user_id: currentUser.id, book_id: activeBook.id, is_read: false },
+        { onConflict: 'user_id,book_id' }
+      )
+      setInReadingList(true)
+    }
+  }
+
+  function formatWaPhone(raw) {
+    const digits = (raw || '').replace(/\D/g, '')
+    if (digits.startsWith('0') && digits.length === 10) return '972' + digits.slice(1)
+    return digits
+  }
+
+  async function sendRecommend(friend, via) {
+    if (!activeBook) return
+    const msg = `היי ${friend.name}! חשבתי שתאהב/י את "${activeBook.title}" מאת ${activeBook.author} — תבדוק/י בספריית המשפחה שלנו! 📚`
+    await supabase.from('Notifications').insert({
+      recipient_id: friend.id,
+      sender_id: currentUser.id,
+      book_id: activeBook.id,
+      message: `${currentUser.name || 'מישהו'} המליץ/ה לך על "${activeBook.title}"`,
+    })
+    if (via === 'whatsapp' && friend.phone) window.open(`https://wa.me/${formatWaPhone(friend.phone)}?text=${encodeURIComponent(msg)}`, '_blank')
+    else if (via === 'sms' && friend.phone) window.open(`sms:${friend.phone}?body=${encodeURIComponent(msg)}`, '_blank')
+    else if (via === 'email' && friend.email) window.open(`mailto:${friend.email}?subject=${encodeURIComponent('ספר שכדאי לך להכיר')}&body=${encodeURIComponent(msg)}`, '_blank')
+    setRecommendSent(true)
+    setTimeout(() => { setShowRecommend(false); setRecommendTarget(null); setRecommendSent(false) }, 1400)
   }
 
   // Build contact options for active book
@@ -107,14 +178,14 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
   const ownerPal = ab ? avatarPalette(ab.add_by) : null
   const holderLabel = !ab ? '' : ab.status === 'borrowed' ? 'מושאל כרגע על ידי' : ab.status === 'unavailable' ? 'נמצא אצל' : 'על המדף של'
   const holderName = !ab ? '' : ab.status === 'borrowed' ? (ab.borrowed_by_name || '—') : ab.status === 'unavailable' ? (ab.Users?.name || 'בעלים') + ' · לא להשאלה' : (ab.Users?.name || 'לא ידוע')
+  const isOwnActiveBook = ab && ab.add_by === currentUser.id
 
   return (
     <div style={{ height: '100vh', display: 'flex', background: '#EDEAE5', fontFamily: "'Source Sans 3',sans-serif", color: '#2C2622', overflow: 'hidden' }}>
 
       {/* ── Sidebar ── */}
-      <aside style={{ width: 264, flexShrink: 0, background: '#F7F5F1', borderRight: '1px solid #E4DED3', display: 'flex', flexDirection: 'column', padding: '26px 20px' }}>
-        {/* logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 34, padding: '0 4px' }}>
+      <aside style={{ width: 240, flexShrink: 0, background: '#F7F5F1', borderRight: '1px solid #E4DED3', display: 'flex', flexDirection: 'column', padding: '26px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 30, padding: '0 4px' }}>
           <div style={{ width: 42, height: 42, borderRadius: 13, background: '#C05A3E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 6px 16px -6px rgba(180,90,60,.55)' }}>
             <span style={{ fontFamily: "'Lora',serif", fontWeight: 600, color: '#F7F5F1', fontSize: 23, lineHeight: 1 }}>F</span>
           </div>
@@ -124,20 +195,35 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
           </div>
         </div>
 
-        {/* shelves */}
-        <div style={{ marginTop: 26, fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#B4ABA0', fontWeight: 600, padding: '0 8px 10px' }}>מדפים</div>
-        <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', margin: '0 -6px', padding: '0 6px' }}>
-          {shelfNav.map(s => (
-            <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 8px', borderRadius: 10 }}>
-              <div style={{ width: 28, height: 28, borderRadius: s.radius, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, color: s.color, flexShrink: 0 }}>{s.label}</div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#4A443D', flex: 1 }}>{s.name}</div>
-              <div style={{ fontSize: 13, color: '#B4ABA0', fontWeight: 600 }}>{s.count}</div>
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {TABS.map(t => {
+            const on = tab === t.key
+            return (
+              <button key={t.key} onClick={() => setTab(t.key)} style={{
+                border: 'none', cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15,
+                textAlign: 'right', padding: '12px 14px', borderRadius: 12,
+                background: on ? '#DCE9D3' : 'transparent', color: on ? '#3F6B41' : '#6E675C',
+                display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+              }}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={on ? '#3F6B41' : '#8A8278'} strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">{t.icon}</svg>
+                {t.label}
+              </button>
+            )
+          })}
         </div>
 
-        {/* user footer */}
-        <div style={{ borderTop: '1px solid #E4DED3', marginTop: 14, paddingTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ flex: 1 }} />
+
+        <button onClick={handleShare} style={{
+          border: '1.5px solid #E7E1D6', cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13.5,
+          textAlign: 'right', padding: '10px 14px', borderRadius: 12, background: '#FFFFFF', color: '#6E675C',
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%', marginBottom: 12,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+          שתף קישור לאפליקציה
+        </button>
+
+        <div style={{ borderTop: '1px solid #E4DED3', paddingTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
           <button onClick={() => setShowProfile(true)} style={{
             display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0,
             padding: '4px 8px', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
@@ -145,7 +231,7 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
             <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: '#7A4A28', flexShrink: 0 }}>{initial(currentUser.name)}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#2C2622', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentUser.name}</div>
-              <div style={{ fontSize: 12, color: '#A39B90' }}>המדף שלך</div>
+              <div style={{ fontSize: 12, color: '#A39B90' }}>הפרופיל שלך</div>
             </div>
           </button>
           <NotificationBell currentUser={currentUser} small />
@@ -154,50 +240,34 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
 
       {/* ── Main ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#FBFAF7' }}>
-        {/* top bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '24px 40px', borderBottom: '1px solid #ECE7DE', background: '#FBFAF7' }}>
           <div style={{ flexShrink: 0 }}>
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622', lineHeight: 1.1 }}>הספרייה שלך</div>
+            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622', lineHeight: 1.1 }}>{TAB_TITLES[tab]}</div>
             <div style={{ fontSize: 14, color: '#8A8278', marginTop: 3 }}>{books.length} {books.length === 1 ? 'ספר' : 'ספרים'} משותפים במעגל שלך</div>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, width: 380, maxWidth: '42%', background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, padding: '11px 16px', boxShadow: '0 2px 8px -5px rgba(60,48,30,.12)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש כותרות או מחברים" dir="rtl" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }} />
-          </div>
-          <button onClick={() => setShowAdd(true)} style={{ flexShrink: 0, border: 'none', borderRadius: 13, padding: '13px 22px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 10px 22px -10px rgba(180,90,60,.7)' }}>
+          {tab === 'home' && (
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, width: 380, maxWidth: '42%', background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 13, padding: '11px 16px', boxShadow: '0 2px 8px -5px rgba(60,48,30,.12)' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></svg>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש כותרות או מחברים" dir="rtl" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }} />
+            </div>
+          )}
+          <button onClick={() => setShowAdd(true)} style={{ flexShrink: 0, marginLeft: tab === 'home' ? 0 : 'auto', border: 'none', borderRadius: 13, padding: '13px 22px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 10px 22px -10px rgba(180,90,60,.7)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>הוסף ספר
           </button>
         </div>
 
-        {/* book board */}
         <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '24px 40px 60px' }}>
-          {loading && <div style={{ textAlign: 'center', padding: '80px 0', color: '#A39B90' }}>טוען…</div>}
-
-          {!loading && filtered.length > 0 && (
-            <BookBoard books={filtered} onBookClick={b => { setActiveBook(b); setShowBack(false) }} columnWidth={260} />
-          )}
-
-          {emptyShelf && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '110px 40px 0' }}>
-              <div style={{ width: 104, height: 104, borderRadius: 30, background: '#F1ECE3', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 26, boxShadow: 'inset 0 2px 6px rgba(120,95,60,.08)' }}>
-                <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-              </div>
-              <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622', margin: '0 0 9px' }}>המדף שלך ריק</h2>
-              <p style={{ fontSize: 16, lineHeight: 1.55, color: '#7C756C', margin: '0 0 28px', maxWidth: 340 }}>הוסף את הספר הראשון והתחל לשתף קריאה עם המשפחה והחברים.</p>
-              <button onClick={() => setShowAdd(true)} style={{ border: 'none', borderRadius: 13, padding: '14px 28px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9, boxShadow: '0 12px 24px -10px rgba(180,90,60,.6)' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>הוסף ספר
-              </button>
-            </div>
-          )}
-          {noMatch && <div style={{ textAlign: 'center', padding: '110px 30px', color: '#A39B90', fontSize: 16 }}>לא נמצאו ספרים התואמים ל"{search}".</div>}
+          {tab === 'home' && <HomeTabDesktop books={books} loading={loading} currentUser={currentUser} search={search} onOpenBook={openBook} />}
+          {tab === 'shelf' && <ShelfTabDesktop currentUser={currentUser} books={books} loading={loading} onOpenBook={openBook} showToast={showToast} />}
+          {tab === 'members' && <MembersTabDesktop currentUser={currentUser} books={books} onOpenBook={openBook} />}
+          {tab === 'activity' && <ActivityTabDesktop currentUser={currentUser} onOpenBook={openBook} />}
         </div>
       </main>
 
       {/* ── Book Detail Modal ── */}
       {activeBook && (
-        <div onClick={() => { setActiveBook(null); setShowContact(false) }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,18,.46)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'flFade .2s ease', padding: 40 }}>
+        <div onClick={closeBook} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,18,.46)', zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'flFade .2s ease', padding: 40 }}>
           <div onClick={e => e.stopPropagation()} style={{ position: 'relative', width: 760, maxWidth: '100%', maxHeight: '88vh', background: '#F7F5F1', borderRadius: 22, overflow: 'hidden', display: 'flex', boxShadow: '0 30px 70px -20px rgba(40,30,18,.55)', animation: 'flPop .26s cubic-bezier(.22,1,.36,1)' }}>
-            {/* left: cover */}
             <div style={{ width: 300, flexShrink: 0, background: '#F1ECE3', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 32px', borderRight: '1px solid #E7E1D6', gap: 12 }}>
               {showBack && activeBook.back_image_url
                 ? <img src={activeBook.back_image_url} alt="back cover" style={{ width: 206, height: 293, objectFit: 'cover', borderRadius: 10, boxShadow: '0 4px 18px -6px rgba(40,30,18,.4)' }} />
@@ -209,7 +279,6 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
                 </button>
               )}
             </div>
-            {/* right: info */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '34px 34px 24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -225,27 +294,52 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
                   )}
                 </div>
                 <h2 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 32, lineHeight: 1.14, color: '#2C2622', margin: '0 0 6px' }}>{activeBook.title}</h2>
-                <div style={{ fontSize: 17, color: '#7C756C', marginBottom: 20 }}>מאת {activeBook.author}</div>
+                <div style={{ fontSize: 17, color: '#7C756C', marginBottom: 14 }}>מאת {activeBook.author}</div>
+
+                {friends.length > 0 && (
+                  <button onClick={() => { setShowRecommend(true); setRecommendTarget(null); setRecommendSent(false) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 999, padding: '8px 14px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13, color: '#6E675C', cursor: 'pointer', marginBottom: 18 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                    המלץ לחבר
+                  </button>
+                )}
+
                 {activeBook.description && <p style={{ fontSize: 16, lineHeight: 1.65, color: '#4A443D', margin: '0 0 22px' }}>{activeBook.description}</p>}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FFFFFF', border: '1.5px solid #ECE7DE', borderRadius: 14, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FFFFFF', border: '1.5px solid #ECE7DE', borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: ownerPal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: ownerPal.color, flexShrink: 0 }}>{initial(activeBook.Users?.name)}</div>
                   <div>
                     <div style={{ fontSize: 12, color: '#A39B90' }}>{holderLabel}</div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: '#2C2622' }}>{holderName}</div>
                   </div>
                 </div>
+
+                {!isOwnActiveBook && (
+                  <button onClick={toggleReadingList} style={{
+                    width: '100%', border: `1.5px solid ${inReadingList ? '#C05A3E' : '#E7E1D6'}`,
+                    background: inReadingList ? '#FBF0EB' : '#FFFFFF',
+                    borderRadius: 13, padding: '13px 16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif",
+                    fontWeight: 600, fontSize: 14.5,
+                    color: inReadingList ? '#C05A3E' : '#6E675C',
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={inReadingList ? '#C05A3E' : '#A39B90'} strokeWidth="2.2" strokeLinecap="round">
+                      {inReadingList ? <path d="M5 13l4 4L19 7" /> : <path d="M12 5v14M5 12h14" />}
+                    </svg>
+                    {inReadingList ? 'נשמר לרשימת הקריאה' : 'הוסף לרשימת הקריאה'}
+                  </button>
+                )}
               </div>
-              {activeBook.add_by === currentUser.id && (
+              {isOwnActiveBook && (
                 <div style={{ padding: '18px 34px 22px', borderTop: '1px solid #ECE7DE', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ flex: 1, fontSize: 13, color: '#A39B90' }}>הוספת ספר זה — אחרים יכולים לשאול אותו ממך.</div>
-                  <button onClick={() => { setEditBook(activeBook); setActiveBook(null); setShowContact(false) }} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '7px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button onClick={() => { setEditBook(activeBook); closeBook() }} style={{ flexShrink: 0, border: '1.5px solid #E7E1D6', background: '#F7F5F1', borderRadius: 12, padding: '7px 16px', fontSize: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#6E675C', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                     ערוך
                   </button>
                 </div>
               )}
             </div>
-            <button onClick={() => { setActiveBook(null); setShowContact(false) }} style={{ position: 'absolute', right: 18, top: 18, width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.85)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px -3px rgba(40,30,18,.3)' }}>
+            <button onClick={closeBook} style={{ position: 'absolute', right: 18, top: 18, width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.85)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px -3px rgba(40,30,18,.3)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
             </button>
           </div>
@@ -271,6 +365,51 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
               </div>
             </div>
           )}
+
+          {/* recommend popover */}
+          {showRecommend && (
+            <div onClick={() => { setShowRecommend(false); setRecommendTarget(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(40,30,18,.4)', zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'flFade .15s ease' }}>
+              <div onClick={e => e.stopPropagation()} style={{ width: 420, maxWidth: '90%', background: '#F7F5F1', borderRadius: 20, padding: 28, animation: 'flPop .24s cubic-bezier(.22,1,.36,1)', boxShadow: '0 24px 56px -18px rgba(40,30,18,.55)' }}>
+                {recommendSent ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0 10px' }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>💌</div>
+                    <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>ההמלצה נשלחה!</div>
+                    <div style={{ fontSize: 14, color: '#7C756C' }}>{recommendTarget?.name} יראה/תראה את ההמלצה שלך.</div>
+                  </div>
+                ) : recommendTarget ? (
+                  <>
+                    <button onClick={() => setRecommendTarget(null)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', padding: 0, marginBottom: 12, cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontSize: 13, fontWeight: 600, color: '#A39B90' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="M15 5l-7 7 7 7" /></svg>
+                      חזרה
+                    </button>
+                    <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622', marginBottom: 6 }}>שליחה אל {recommendTarget.name}</div>
+                    <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>המלצה על "{activeBook.title}" עבור {recommendTarget.name}:</div>
+                    <RecommendBtn icon="🔔" label="הודעה בתוך האפליקציה" sub="יראה/תראה את ההמלצה שלך" onClick={() => sendRecommend(recommendTarget, 'inapp')} color="#C05A3E" />
+                    {recommendTarget.phone ? (<>
+                      <RecommendBtn icon="💬" label="WhatsApp" sub={recommendTarget.phone} onClick={() => sendRecommend(recommendTarget, 'whatsapp')} color="#25D366" />
+                      <RecommendBtn icon="📱" label="SMS" sub={recommendTarget.phone} onClick={() => sendRecommend(recommendTarget, 'sms')} color="#5A7FE0" />
+                    </>) : null}
+                    {recommendTarget.email ? (
+                      <RecommendBtn icon="✉️" label="אימייל" sub={recommendTarget.email} onClick={() => sendRecommend(recommendTarget, 'email')} color="#C05A3E" />
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 21, color: '#2C2622', marginBottom: 6 }}>המלץ לחבר</div>
+                    <div style={{ fontSize: 14, color: '#7C756C', marginBottom: 22 }}>למי כדאי לספר על "{activeBook.title}"?</div>
+                    {friends.map(f => (
+                      <button key={f.id} onClick={() => setRecommendTarget(f)} style={{ width: '100%', border: '1.5px solid #ECE7DE', background: '#FFFFFF', borderRadius: 14, padding: '12px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarPalette(f.id).bg, color: avatarPalette(f.id).color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flex: 'none' }}>{initial(f.name)}</div>
+                        <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622' }}>{f.name}</div>
+                        <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
+                      </button>
+                    ))}
+                  </>
+                )}
+                <button onClick={() => { setShowRecommend(false); setRecommendTarget(null) }} style={{ marginTop: 8, width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 13, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#6E675C', cursor: 'pointer' }}>ביטול</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -288,7 +427,6 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
       {showProfile && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
           <Profile currentUser={currentUser} onClose={() => setShowProfile(false)}
-            onEdit={b => { setShowProfile(false); setEditBook(b) }}
             onUserUpdate={u => { setCurrentUser(u); onUserUpdate?.(u) }}
             onLogout={handleLogout} />
         </div>
@@ -296,5 +434,18 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
 
       <Toast message={toast} />
     </div>
+  )
+}
+
+function RecommendBtn({ icon, label, sub, onClick, color }) {
+  return (
+    <button onClick={onClick} style={{ width: '100%', border: '1.5px solid #ECE7DE', background: '#FFFFFF', borderRadius: 14, padding: '14px 16px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', textAlign: 'left' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 12, background: color + '1A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flex: 'none' }}>{icon}</div>
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622' }}>{label}</div>
+        <div style={{ fontSize: 13, color: '#A39B90', marginTop: 1 }}>{sub}</div>
+      </div>
+      <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
+    </button>
   )
 }
