@@ -1,36 +1,54 @@
 import { useState } from 'react'
-import { STATUS, TOPICS, initial } from './lib/utils'
+import { STATUS, TOPICS, avatarPalette, initial } from './lib/utils'
 import BookCover from './BookCover'
 import NotificationBell from './NotificationBell'
 
 export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpenAdd, onOpenProfile, onShare }) {
   const [search, setSearch] = useState('')
-  const [topicFilter, setTopicFilter] = useState('all')
+  const [mode, setMode] = useState('topic') // 'topic' | 'user'
+  const [selectedTopics, setSelectedTopics] = useState([])
+  const [selectedUsers, setSelectedUsers] = useState([])
 
   const q = search.trim().toLowerCase()
-  const pool = books.filter(b =>
-    (!q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)) &&
-    (topicFilter === 'all' || b.topic === topicFilter)
+  const searched = books.filter(b =>
+    !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)
   )
 
-  const byTopic = {}
-  pool.forEach(b => { (byTopic[b.topic] = byTopic[b.topic] || []).push(b) })
-  const topicGroups = Object.keys(byTopic).sort().map(t => ({ title: t, books: byTopic[t] }))
+  const owners = {}
+  books.forEach(b => { if (!owners[b.add_by]) owners[b.add_by] = { id: b.add_by, name: b.Users?.name || 'לא ידוע' } })
+  const ownerList = Object.values(owners).sort((a, b) => a.name.localeCompare(b.name, 'he'))
 
-  const byOwner = {}
-  pool.filter(b => b.add_by !== currentUser.id).forEach(b => {
-    (byOwner[b.add_by] = byOwner[b.add_by] || []).push(b)
-  })
-  const circleGroups = Object.entries(byOwner).map(([uid, bks]) => ({
-    title: `המדף של ${bks[0].Users?.name || 'חבר'}`, books: bks,
-  }))
+  let groups = []
+  if (mode === 'topic') {
+    const pool = selectedTopics.length ? searched.filter(b => selectedTopics.includes(b.topic)) : searched
+    const byTopic = {}
+    pool.forEach(b => { (byTopic[b.topic] = byTopic[b.topic] || []).push(b) })
+    groups = TOPICS.filter(t => byTopic[t]?.length).map(t => ({ key: t, title: t, books: byTopic[t], subtitleOwner: true }))
+  } else {
+    const pool = selectedUsers.length ? searched.filter(b => selectedUsers.includes(b.add_by)) : searched
+    const byOwner = {}
+    pool.forEach(b => { (byOwner[b.add_by] = byOwner[b.add_by] || []).push(b) })
+    groups = ownerList.filter(o => byOwner[o.id]?.length).map(o => {
+      const byTopic = {}
+      byOwner[o.id].forEach(b => { (byTopic[b.topic] = byTopic[b.topic] || []).push(b) })
+      return {
+        key: o.id, ownerName: o.name,
+        topics: TOPICS.filter(t => byTopic[t]?.length).map(t => ({ key: t, title: t, books: byTopic[t] })),
+      }
+    })
+  }
 
   const homeEmpty = books.length === 0 && !loading
-  const homeNoMatch = !homeEmpty && !loading && topicGroups.length === 0 && circleGroups.length === 0
+  const homeNoMatch = !homeEmpty && !loading && groups.length === 0
 
   const firstName = currentUser.name ? currentUser.name.split(' ')[0] : 'שם'
 
-  const chips = [{ key: 'all', label: 'כל המדף' }, ...TOPICS.map(t => ({ key: t, label: t }))]
+  function toggleTopic(t) {
+    setSelectedTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
+  function toggleUser(id) {
+    setSelectedUsers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
@@ -53,15 +71,40 @@ export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpe
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="חיפוש ספרים ומחברים" dir="rtl" style={{ border: 'none', background: 'transparent', outline: 'none', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', width: '100%' }} />
         </div>
 
-        <div className="fl-scroll" style={{ display: 'flex', gap: 9, overflowX: 'auto' }}>
-          {chips.map(c => {
-            const on = topicFilter === c.key
+        {/* mode toggle */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, background: '#EFEAE1', borderRadius: 12, padding: 4 }}>
+          {[['topic', 'לפי נושא'], ['user', 'לפי משתמש']].map(([key, label]) => {
+            const on = mode === key
             return (
-              <button key={c.key} onClick={() => setTopicFilter(c.key)} style={{
+              <button key={key} onClick={() => setMode(key)} style={{
+                flex: 1, border: 'none', cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif",
+                fontWeight: 600, fontSize: 14, padding: '9px 0', borderRadius: 9,
+                background: on ? '#FFFFFF' : 'transparent', color: on ? '#2C2622' : '#8A8278',
+                boxShadow: on ? '0 1px 4px rgba(40,30,18,.12)' : 'none',
+              }}>{label}</button>
+            )
+          })}
+        </div>
+
+        {/* multi-select chips */}
+        <div className="fl-scroll" style={{ display: 'flex', gap: 9, overflowX: 'auto' }}>
+          {mode === 'topic' ? TOPICS.map(t => {
+            const on = selectedTopics.includes(t)
+            return (
+              <button key={t} onClick={() => toggleTopic(t)} style={{
                 flex: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif",
                 fontWeight: 600, fontSize: 13.5, padding: '9px 16px', borderRadius: 999,
                 background: on ? '#DCE9D3' : '#EFEAE1', color: on ? '#3F6B41' : '#6E675C', whiteSpace: 'nowrap',
-              }}>{c.label}</button>
+              }}>{t}</button>
+            )
+          }) : ownerList.map(o => {
+            const on = selectedUsers.includes(o.id)
+            return (
+              <button key={o.id} onClick={() => toggleUser(o.id)} style={{
+                flex: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif",
+                fontWeight: 600, fontSize: 13.5, padding: '9px 16px', borderRadius: 999,
+                background: on ? '#DCE9D3' : '#EFEAE1', color: on ? '#3F6B41' : '#6E675C', whiteSpace: 'nowrap',
+              }}>{o.name}</button>
             )
           })}
         </div>
@@ -70,11 +113,17 @@ export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpe
       <div className="fl-scroll" style={{ flex: 1, overflowY: 'auto', padding: '6px 0 116px' }}>
         {loading && <div style={{ textAlign: 'center', padding: '60px 30px', color: '#A39B90', fontSize: 15 }}>טוען…</div>}
 
-        {topicGroups.map(group => (
-          <BookRow key={group.title} title={group.title} books={group.books} subtitleOwner onOpenBook={onOpenBook} />
+        {mode === 'topic' && groups.map(group => (
+          <BookRow key={group.key} title={group.title} books={group.books} subtitleOwner onOpenBook={onOpenBook} />
         ))}
-        {circleGroups.map(group => (
-          <BookRow key={group.title} title={group.title} books={group.books} onOpenBook={onOpenBook} />
+
+        {mode === 'user' && groups.map(group => (
+          <div key={group.key} style={{ marginTop: 22 }}>
+            <UserHeader id={group.key} name={group.ownerName} />
+            {group.topics.map(t => (
+              <BookRow key={t.key} title={t.title} books={t.books} level={2} onOpenBook={onOpenBook} />
+            ))}
+          </div>
         ))}
 
         {homeEmpty && (
@@ -98,10 +147,25 @@ export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpe
   )
 }
 
-function BookRow({ title, books, subtitleOwner, onOpenBook }) {
+function UserHeader({ id, name }) {
+  const pal = avatarPalette(id)
   return (
-    <div style={{ marginTop: 18 }}>
-      <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 17, color: '#2C2622', padding: '0 20px 12px' }}>{title}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 20px 10px' }}>
+      <div style={{ width: 26, height: 26, borderRadius: '50%', background: pal.bg, color: pal.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11, flex: 'none' }}>{initial(name)}</div>
+      <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 17, color: '#2C2622' }}>{name}</div>
+    </div>
+  )
+}
+
+function BookRow({ title, books, subtitleOwner, level = 1, onOpenBook }) {
+  const isSub = level === 2
+  return (
+    <div style={{ marginTop: isSub ? 14 : 18 }}>
+      {isSub ? (
+        <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#8A6A3A', padding: '0 20px 8px' }}>{title}</div>
+      ) : (
+        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 17, color: '#2C2622', padding: '0 20px 12px' }}>{title}</div>
+      )}
       <div className="fl-scroll" style={{ display: 'flex', gap: 14, overflowX: 'auto', padding: '0 20px 4px' }}>
         {books.map(book => {
           const s = STATUS[book.status] || STATUS.available
