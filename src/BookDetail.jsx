@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import BookCover from './BookCover'
-import { STATUS, TOPIC_LABELS, avatarPalette, initial } from './lib/utils'
+import { STATUS, TOPIC_LABELS, avatarPalette, initial, isHebrewText } from './lib/utils'
 import { supabase } from './lib/supabase'
+import { translateToHebrew } from './lib/scanner'
 
 export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdit }) {
   const [showContact, setShowContact] = useState(false)
@@ -15,6 +16,10 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
   const [friends, setFriends] = useState([])
   const [queue, setQueue] = useState([])
   const [joining, setJoining] = useState(false)
+  const [translated, setTranslated] = useState(null)
+  const [translating, setTranslating] = useState(false)
+  const [translateError, setTranslateError] = useState('')
+  const [showTranslated, setShowTranslated] = useState(false)
 
   useEffect(() => {
     supabase.from('reading_list')
@@ -160,6 +165,21 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
     setTimeout(closeRecommend, 1400)
   }
 
+  async function handleTranslate() {
+    if (translated) { setShowTranslated(v => !v); return }
+    setTranslating(true)
+    setTranslateError('')
+    try {
+      const result = await translateToHebrew(book.description)
+      setTranslated(result)
+      setShowTranslated(true)
+    } catch (err) {
+      setTranslateError('לא הצלחנו לתרגם — נסה שנית.')
+    } finally {
+      setTranslating(false)
+    }
+  }
+
   async function toggleReadingList() {
     setRlLoading(true)
     if (inReadingList) {
@@ -268,7 +288,25 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
           )}
 
           {book.description && (
-            <p style={{ fontSize: 16, lineHeight: 1.6, color: '#4A443D', margin: '0 0 18px' }}>{book.description}</p>
+            <div style={{ marginBottom: 18 }}>
+              <p style={{ fontSize: 16, lineHeight: 1.6, color: '#4A443D', margin: '0 0 8px', direction: showTranslated ? 'rtl' : 'ltr', textAlign: showTranslated ? 'right' : 'left' }}>
+                {showTranslated && translated ? translated : book.description}
+              </p>
+              {!isHebrewText(book.description) && (
+                <button onClick={handleTranslate} disabled={translating} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13, color: '#C05A3E', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" /></svg>
+                  {translating ? 'מתרגם…' : translated ? (showTranslated ? 'הצג במקור' : 'הצג תרגום') : 'תרגם לעברית'}
+                </button>
+              )}
+              {translateError && <div style={{ fontSize: 12, color: '#B24A3A', marginTop: 4 }}>{translateError}</div>}
+            </div>
+          )}
+
+          {book.owner_review && (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#A39B90', marginBottom: 6 }}>חוות דעת הבעלים</div>
+              <p style={{ fontSize: 15, lineHeight: 1.6, color: '#4A443D', margin: 0, fontStyle: 'italic' }}>{book.owner_review}</p>
+            </div>
           )}
 
           <div style={{

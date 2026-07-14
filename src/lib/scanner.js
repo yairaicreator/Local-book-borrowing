@@ -305,6 +305,39 @@ export async function analyzeBackCoverWithGemini(file) {
   throw new Error(`Gemini לא זמין: ${lastErr}`)
 }
 
+// ─── Translation (English description → Hebrew) ───────────────────────────────
+export async function translateToHebrew(text) {
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: `Translate the following book description to Hebrew. Output ONLY the Hebrew translation, no commentary, no quotes:\n\n${text}` }] }],
+    generationConfig: { temperature: 0, maxOutputTokens: 2000 },
+  })
+
+  let lastErr = 'no models tried'
+  let rateLimitCount = 0
+  for (let i = 0; i < GEMINI_MODELS.length; i++) {
+    const model = GEMINI_MODELS[i]
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }
+    )
+    if (res.status === 429) {
+      rateLimitCount++
+      lastErr = `${model} rate limited`
+      await new Promise(r => setTimeout(r, 2000))
+      continue
+    }
+    if (res.status === 404) { lastErr = `${model} not found`; continue }
+    if (!res.ok) { lastErr = `${model} ${res.status}`; continue }
+
+    const data = await res.json()
+    const translated = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+    if (!translated) { lastErr = `${model} empty response`; continue }
+    return translated
+  }
+  if (rateLimitCount > 0) throw new Error('מגבלת קצב של Gemini — המתן מספר שניות ונסה שנית')
+  throw new Error(`Gemini לא זמין: ${lastErr}`)
+}
+
 // ─── Option B: Auto-search from OCR text ─────────────────────────────────────
 // Smart OCR: search Google Books + Open Library with the full cover text.
 // If a book is found whose title words appear in the OCR, return full book info.

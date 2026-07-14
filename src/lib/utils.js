@@ -40,6 +40,10 @@ export function initial(name) {
   return (name || '?')[0].toUpperCase()
 }
 
+export function isHebrewText(str) {
+  return /[א-ת]/.test(str || '')
+}
+
 export const STATUS = {
   available:   { label: 'זמין',     color: '#2E8B57', bg: '#E2F1E7' },
   borrowed:    { label: 'מושאל',    color: '#B8860B', bg: '#F6EDD4' },

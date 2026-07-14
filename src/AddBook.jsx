@@ -10,6 +10,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [title, setTitle] = useState(bookToEdit?.title || '')
   const [author, setAuthor] = useState(bookToEdit?.author || '')
   const [description, setDescription] = useState(bookToEdit?.description || '')
+  const [ownerReview, setOwnerReview] = useState(bookToEdit?.owner_review || '')
   const [topic, setTopic] = useState(bookToEdit?.topic || TOPICS[0])
   const [status, setStatus] = useState(bookToEdit?.status || 'available')
   const [imageFile, setImageFile] = useState(null)
@@ -144,6 +145,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         const { error: updErr } = await supabase.from('Books').update({
           title: title.trim(), author: author.trim(),
           description: description.trim() || null,
+          owner_review: ownerReview.trim() || null,
           topic, status, image_url, back_image_url,
         }).eq('id', bookToEdit.id)
         if (updErr) throw updErr
@@ -151,6 +153,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         const { error: insErr } = await supabase.from('Books').insert({
           title: title.trim(), author: author.trim(),
           description: description.trim() || null,
+          owner_review: ownerReview.trim() || null,
           topic, status, add_by: currentUser.id, image_url, back_image_url,
         })
         if (insErr) throw insErr
@@ -258,6 +261,9 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
             <DLabel style={{ marginTop: 6 }}>תיאור</DLabel>
             <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="כמה מילים על הספר…" dir="rtl" rows={3} style={{ ...dinputStyle, resize: 'none' }} onFocus={f} onBlur={b} />
 
+            <DLabel>חוות דעת <span style={photoSub}>(אופציונלי — מה חשבת על הספר?)</span></DLabel>
+            <textarea value={ownerReview} onChange={e => setOwnerReview(e.target.value)} placeholder="מה דעתך על הספר?" dir="rtl" rows={3} style={{ ...dinputStyle, resize: 'none' }} onFocus={f} onBlur={b} />
+
             <DLabel>סטטוס השאלה</DLabel>
             <StatusPicker status={status} setStatus={setStatus} />
             {error && <div style={{ color: '#B24A3A', fontSize: 14, marginTop: 10 }}>{error}</div>}
@@ -352,6 +358,8 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         <input value={author} onChange={e => setAuthor(e.target.value)} placeholder="שם המחבר" dir="rtl" style={inputStyle} onFocus={focusBorder} onBlur={blurBorder} />
         <Label>תיאור</Label>
         <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="כמה מילים על הספר…" dir="rtl" rows={3} style={{ ...inputStyle, resize: 'none' }} onFocus={focusBorder} onBlur={blurBorder} />
+        <Label>חוות דעת <span style={{ fontWeight: 400 }}>(אופציונלי — מה חשבת על הספר?)</span></Label>
+        <textarea value={ownerReview} onChange={e => setOwnerReview(e.target.value)} placeholder="מה דעתך על הספר?" dir="rtl" rows={3} style={{ ...inputStyle, resize: 'none' }} onFocus={focusBorder} onBlur={blurBorder} />
         <Label>נושא</Label>
         <div style={{ position: 'relative', marginBottom: 18 }}>
           <select value={topic} onChange={e => setTopic(e.target.value)} style={{ ...inputStyle, appearance: 'none', marginBottom: 0 }}>
@@ -380,7 +388,7 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
             <button onClick={() => { dupConfirmedRef.current = true; setShowDupConfirm(false); handleSave() }} style={{ width: '100%', border: 'none', borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1', background: '#C05A3E', cursor: 'pointer', marginBottom: 10 }}>
               כן, הוסף עותק נוסף
             </button>
-            <button onClick={() => { setShowDupConfirm(false); setTitle(''); setAuthor(''); setDescription(''); setImagePreview(null); setImageFile(null); setSearchQuery('') }} style={{ width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#6E675C', cursor: 'pointer' }}>
+            <button onClick={() => { setShowDupConfirm(false); setTitle(''); setAuthor(''); setDescription(''); setOwnerReview(''); setImagePreview(null); setImageFile(null); setSearchQuery('') }} style={{ width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#6E675C', cursor: 'pointer' }}>
               לא, הוסף ספר אחר
             </button>
           </div>

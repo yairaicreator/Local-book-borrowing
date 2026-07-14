@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import { STATUS, TOPIC_LABELS, avatarPalette, initial } from './lib/utils'
+import { STATUS, TOPIC_LABELS, avatarPalette, initial, isHebrewText } from './lib/utils'
+import { translateToHebrew } from './lib/scanner'
 import BookCover from './BookCover'
 import HomeTabDesktop from './HomeTabDesktop'
 import ShelfTabDesktop from './ShelfTabDesktop'
@@ -40,6 +41,10 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
   const [inReadingList, setInReadingList] = useState(false)
   const [queue, setQueue] = useState([])
   const [joining, setJoining] = useState(false)
+  const [translated, setTranslated] = useState(null)
+  const [translating, setTranslating] = useState(false)
+  const [translateError, setTranslateError] = useState('')
+  const [showTranslated, setShowTranslated] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [toast, setToast] = useState('')
   const toastRef = { current: null }
@@ -98,6 +103,9 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
     const full = books.find(b => b.id === book.id) || book
     setActiveBook(full)
     setShowBack(false)
+    setTranslated(null)
+    setShowTranslated(false)
+    setTranslateError('')
   }
 
   function closeBook() {
@@ -106,6 +114,22 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
     setShowRecommend(false)
     setRecommendTarget(null)
     setRecommendSent(false)
+  }
+
+  async function handleTranslate() {
+    if (!activeBook) return
+    if (translated) { setShowTranslated(v => !v); return }
+    setTranslating(true)
+    setTranslateError('')
+    try {
+      const result = await translateToHebrew(activeBook.description)
+      setTranslated(result)
+      setShowTranslated(true)
+    } catch (err) {
+      setTranslateError('לא הצלחנו לתרגם — נסה שנית.')
+    } finally {
+      setTranslating(false)
+    }
   }
 
   async function handleBorrow(book) {
@@ -352,7 +376,27 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
                   </button>
                 )}
 
-                {activeBook.description && <p style={{ fontSize: 16, lineHeight: 1.65, color: '#4A443D', margin: '0 0 22px' }}>{activeBook.description}</p>}
+                {activeBook.description && (
+                  <div style={{ marginBottom: 22 }}>
+                    <p style={{ fontSize: 16, lineHeight: 1.65, color: '#4A443D', margin: '0 0 8px', direction: showTranslated ? 'rtl' : 'ltr', textAlign: showTranslated ? 'right' : 'left' }}>
+                      {showTranslated && translated ? translated : activeBook.description}
+                    </p>
+                    {!isHebrewText(activeBook.description) && (
+                      <button onClick={handleTranslate} disabled={translating} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13, color: '#C05A3E', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C05A3E" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" /></svg>
+                        {translating ? 'מתרגם…' : translated ? (showTranslated ? 'הצג במקור' : 'הצג תרגום') : 'תרגם לעברית'}
+                      </button>
+                    )}
+                    {translateError && <div style={{ fontSize: 12, color: '#B24A3A', marginTop: 4 }}>{translateError}</div>}
+                  </div>
+                )}
+
+                {activeBook.owner_review && (
+                  <div style={{ marginBottom: 22 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#A39B90', marginBottom: 6 }}>חוות דעת הבעלים</div>
+                    <p style={{ fontSize: 15, lineHeight: 1.6, color: '#4A443D', margin: 0, fontStyle: 'italic' }}>{activeBook.owner_review}</p>
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#FFFFFF', border: '1.5px solid #ECE7DE', borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: ownerPal.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, color: ownerPal.color, flexShrink: 0 }}>{initial(activeBook.Users?.name)}</div>
                   <div>
