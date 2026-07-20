@@ -2,13 +2,19 @@ import { useState } from 'react'
 import { supabase } from './lib/supabase'
 
 export default function NameEntry({ onDone }) {
+  const [mode, setMode] = useState('new') // 'new' | 'recover'
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const empty = name.trim().length === 0
+  const [recoverValue, setRecoverValue] = useState('')
+  const [recovering, setRecovering] = useState(false)
+  const [recoverError, setRecoverError] = useState('')
+
+  const missingContact = !phone.trim() && !email.trim()
+  const empty = name.trim().length === 0 || missingContact
 
   async function handleSubmit() {
     if (empty || loading) return
@@ -31,6 +37,89 @@ export default function NameEntry({ onDone }) {
       setError('Something went wrong. Please try again.')
       setLoading(false)
     }
+  }
+
+  async function handleRecover() {
+    const val = recoverValue.trim()
+    if (!val || recovering) return
+    setRecovering(true)
+    setRecoverError('')
+    try {
+      const [{ data: byPhone }, { data: byEmail }] = await Promise.all([
+        supabase.from('Users').select('*').eq('phone', val).limit(1),
+        supabase.from('Users').select('*').eq('email', val).limit(1),
+      ])
+      const found = byPhone?.[0] || byEmail?.[0]
+      if (!found) {
+        setRecoverError('No account found with that phone or email.')
+        setRecovering(false)
+        return
+      }
+      localStorage.setItem('fl_user', JSON.stringify(found))
+      onDone(found)
+    } catch (e) {
+      setRecoverError('Something went wrong. Please try again.')
+      setRecovering(false)
+    }
+  }
+
+  if (mode === 'recover') {
+    return (
+      <div className="fl-scroll" style={{
+        position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', padding: '40px 34px',
+        background: '#F7F5F1', overflowY: 'auto',
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: 15, background: '#C05A3E',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginBottom: 30, boxShadow: '0 8px 20px -6px rgba(180,90,60,.55)',
+          flexShrink: 0,
+        }}>
+          <span style={{ fontFamily: "'Lora',serif", fontWeight: 600, color: '#F7F5F1', fontSize: 27, lineHeight: 1 }}>F</span>
+        </div>
+
+        <h1 style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 34, lineHeight: 1.1, color: '#2C2622', margin: '0 0 10px' }}>
+          Recover your account
+        </h1>
+        <p style={{ fontSize: 15, lineHeight: 1.5, color: '#7C756C', margin: '0 0 28px', maxWidth: 280 }}>
+          Enter the phone number or email you signed up with.
+        </p>
+
+        <FieldInput
+          label="Phone or email"
+          value={recoverValue}
+          onChange={setRecoverValue}
+          placeholder="+972 50 000 0000 or you@example.com"
+          autoFocus
+          onEnter={handleRecover}
+        />
+
+        {recoverError && <div style={{ color: '#B24A3A', fontSize: 14, marginBottom: 8 }}>{recoverError}</div>}
+
+        <button
+          onClick={handleRecover}
+          disabled={!recoverValue.trim() || recovering}
+          style={{
+            marginTop: 8, width: '100%', border: 'none', borderRadius: 16,
+            padding: 17, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600,
+            fontSize: 17, color: '#F7F5F1',
+            background: !recoverValue.trim() ? '#E3B5A8' : '#C05A3E',
+            cursor: !recoverValue.trim() || recovering ? 'not-allowed' : 'pointer',
+            opacity: !recoverValue.trim() ? 0.7 : 1, transition: 'background .2s, opacity .2s',
+          }}
+        >
+          {recovering ? 'Looking…' : 'Recover account'}
+        </button>
+
+        <button
+          onClick={() => { setMode('new'); setRecoverError('') }}
+          style={{ marginTop: 18, border: 'none', background: 'transparent', color: '#A39B90', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}
+        >
+          Back to sign up
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -68,7 +157,7 @@ export default function NameEntry({ onDone }) {
       />
 
       <div style={{ fontSize: 13, color: '#A39B90', margin: '4px 0 18px', fontStyle: 'italic' }}>
-        Optional — so others can reach you when they want to borrow a book:
+        Add a phone number or email — so you can recover your account if you're logged out, and friends can reach you:
       </div>
 
       <FieldInput
@@ -88,6 +177,9 @@ export default function NameEntry({ onDone }) {
         onEnter={handleSubmit}
       />
 
+      {missingContact && name.trim() && (
+        <div style={{ color: '#B24A3A', fontSize: 13, marginBottom: 8 }}>Please add a phone number or email.</div>
+      )}
       {error && <div style={{ color: '#B24A3A', fontSize: 14, marginBottom: 8 }}>{error}</div>}
 
       <button
@@ -103,6 +195,13 @@ export default function NameEntry({ onDone }) {
         }}
       >
         {loading ? 'Saving…' : 'Continue'}
+      </button>
+
+      <button
+        onClick={() => { setMode('recover'); setError('') }}
+        style={{ marginTop: 18, border: 'none', background: 'transparent', color: '#A39B90', fontSize: 14, cursor: 'pointer', textDecoration: 'underline' }}
+      >
+        Already have an account? Recover it
       </button>
     </div>
   )
