@@ -3,7 +3,7 @@ import { STATUS, TOPICS, avatarPalette, initial } from './lib/utils'
 import BookCover from './BookCover'
 import NotificationBell from './NotificationBell'
 
-export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpenAdd, onOpenProfile, onShare }) {
+export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpenAdd, onOpenProfile, onShare, onGoToActivity }) {
   const [search, setSearch] = useState('')
   const [mode, setMode] = useState('topic') // 'topic' | 'user'
   const [selectedTopics, setSelectedTopics] = useState([])
@@ -60,7 +60,7 @@ export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpe
           <button onClick={onShare} title="שתף קישור לאפליקציה" style={{ width: 38, height: 38, borderRadius: '50%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
           </button>
-          <NotificationBell currentUser={currentUser} small />
+          <NotificationBell currentUser={currentUser} small onGoToActivity={onGoToActivity} />
           <button onClick={onOpenProfile} style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 15, color: '#7A4A28', flex: 'none', border: 'none', cursor: 'pointer' }}>
             {initial(currentUser.name)}
           </button>

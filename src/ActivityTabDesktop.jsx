@@ -142,7 +142,7 @@ export default function ActivityTabDesktop({ currentUser, onOpenBook }) {
                     </div>
                     <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
                       <button onClick={() => declineRequest(req)} disabled={busyIncoming === req.id} style={btnGhost('#B24A3A')}>דחה</button>
-                      <button onClick={() => handOverBook(req)} disabled={busyIncoming === req.id} style={btnSolid}>{busyIncoming === req.id ? '…' : 'מסרתי את הספר'}</button>
+                      <button onClick={() => handOverBook(req)} disabled={busyIncoming === req.id} style={btnSolid}>{busyIncoming === req.id ? '…' : 'אישור מסירה'}</button>
                     </div>
                   </Row>
                 ))

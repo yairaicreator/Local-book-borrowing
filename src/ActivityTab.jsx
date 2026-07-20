@@ -151,7 +151,7 @@ export default function ActivityTab({ currentUser, onOpenBook }) {
                         דחה
                       </button>
                       <button onClick={() => handOverBook(req)} disabled={busyIncoming === req.id} style={{ border: 'none', background: '#C05A3E', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, color: '#F7F5F1', cursor: 'pointer' }}>
-                        {busyIncoming === req.id ? '…' : 'מסרתי את הספר'}
+                        {busyIncoming === req.id ? '…' : 'אישור מסירה'}
                       </button>
                     </div>
                   </div>

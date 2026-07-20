@@ -75,7 +75,8 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
       {tab === 'home' && (
         <HomeTab books={books} loading={loading} currentUser={currentUser}
           onOpenBook={openBook} onOpenAdd={() => setShowAdd(true)}
-          onOpenProfile={() => setShowProfile(true)} onShare={handleShare} />
+          onOpenProfile={() => setShowProfile(true)} onShare={handleShare}
+          onGoToActivity={() => setTab('activity')} />
       )}
       {tab === 'shelf' && (
         <ShelfTab currentUser={currentUser} books={books} loading={loading}

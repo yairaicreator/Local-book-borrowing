@@ -298,7 +298,7 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
               <div style={{ fontSize: 12, color: '#A39B90' }}>הפרופיל שלך</div>
             </div>
           </button>
-          <NotificationBell currentUser={currentUser} small />
+          <NotificationBell currentUser={currentUser} small onGoToActivity={() => setTab('activity')} />
         </div>
       </aside>
 

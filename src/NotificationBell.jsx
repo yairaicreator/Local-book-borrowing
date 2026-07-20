@@ -9,7 +9,9 @@ function timeAgo(ts) {
   return `לפני ${Math.floor(diff / 86400)} ימים`
 }
 
-export default function NotificationBell({ currentUser, small = false }) {
+const BORROW_REQUEST_RE = /ביקש.*לשאול/
+
+export default function NotificationBell({ currentUser, small = false, onGoToActivity }) {
   const [notifs, setNotifs] = useState([])
   const [open, setOpen] = useState(false)
   const panelRef = useRef()
@@ -89,19 +91,31 @@ export default function NotificationBell({ currentUser, small = false }) {
               <div style={{ padding: '28px 18px', textAlign: 'center', fontSize: 14, color: '#A39B90' }}>
                 אין התראות
               </div>
-            ) : notifs.map(n => (
-              <div key={n.id} style={{
-                padding: '13px 18px', borderBottom: '1px solid #F0EBE3',
-                background: n.is_read ? 'transparent' : '#FDF6F0',
-                display: 'flex', gap: 12, alignItems: 'flex-start',
-              }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.is_read ? 'transparent' : '#C05A3E', marginTop: 6, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, color: '#2C2622', lineHeight: 1.45 }}>{n.message}</div>
-                  <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>{timeAgo(n.created_at)}</div>
+            ) : notifs.map(n => {
+              const isBorrowRequest = BORROW_REQUEST_RE.test(n.message)
+              return (
+                <div key={n.id} style={{
+                  padding: '13px 18px', borderBottom: '1px solid #F0EBE3',
+                  background: n.is_read ? 'transparent' : '#FDF6F0',
+                  display: 'flex', gap: 12, alignItems: 'flex-start',
+                }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.is_read ? 'transparent' : '#C05A3E', marginTop: 6, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, color: '#2C2622', lineHeight: 1.45 }}>{n.message}</div>
+                    <div style={{ fontSize: 12, color: '#A39B90', marginTop: 4 }}>{timeAgo(n.created_at)}</div>
+                    {isBorrowRequest && onGoToActivity && (
+                      <button onClick={() => { setOpen(false); onGoToActivity() }} style={{
+                        marginTop: 8, border: 'none', background: '#C05A3E', color: '#F7F5F1',
+                        borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontFamily: "'Source Sans 3',sans-serif",
+                        fontWeight: 600, cursor: 'pointer',
+                      }}>
+                        עבור לפעילות
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
