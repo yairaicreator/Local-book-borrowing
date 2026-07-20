@@ -55,8 +55,8 @@ export default function App() {
 
   if (!user) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
-        <div style={{ position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh', background: '#F5F0E6', overflow: 'hidden' }}>
+      <div dir="rtl" className="fl-app-shell" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: 430, height: '100%', background: '#F5F0E6', overflow: 'hidden' }}>
           <NameEntry onDone={setUser} />
         </div>
       </div>
@@ -68,8 +68,8 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
-      <div style={{ position: 'relative', width: '100%', maxWidth: 430, minHeight: '100vh', background: '#F5F0E6', overflow: 'hidden' }}>
+    <div dir="rtl" className="fl-app-shell" style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center', background: '#EDEAE5', fontFamily: "'Source Sans 3', sans-serif" }}>
+      <div style={{ position: 'relative', width: '100%', maxWidth: 430, height: '100%', background: '#F5F0E6', overflow: 'hidden' }}>
         <Home currentUser={user} onUserUpdate={setUser} />
       </div>
     </div>

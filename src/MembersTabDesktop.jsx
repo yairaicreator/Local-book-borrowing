@@ -26,7 +26,7 @@ export default function MembersTabDesktop({ currentUser, books, onOpenBook }) {
     return (
       <>
         <button onClick={() => setFocusedId(null)} style={{ border: 'none', cursor: 'pointer', background: '#F0ECE4', borderRadius: 999, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 13, color: '#6E675C', marginBottom: 18 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round"><path d="M15 5l-7 7 7 7" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.4" strokeLinecap="round"><path d="M9 5l7 7-7 7" /></svg>
           כל החברים
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
@@ -71,7 +71,7 @@ export default function MembersTabDesktop({ currentUser, books, onOpenBook }) {
               <div style={{ fontWeight: 600, fontSize: 16, color: '#2C2622' }}>{m.name}</div>
               <div style={{ fontSize: 13, color: '#A39B90', marginTop: 1 }}>{m.count} {m.count === 1 ? 'ספר' : 'ספרים'}</div>
             </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
         ))}
       </div>

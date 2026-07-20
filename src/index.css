@@ -1,7 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Sans+3:wght@400;500;600;700&display=swap');
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; }
+html, body { height: 100vh; height: 100dvh; overflow: hidden; margin: 0; }
+#app { height: 100%; }
+.fl-app-shell { height: 100vh; height: 100dvh; }
 
 .fl-scroll::-webkit-scrollbar { display: none; }
 .fl-scroll { -ms-overflow-style: none; scrollbar-width: none; }

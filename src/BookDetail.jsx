@@ -479,7 +479,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
             ) : recommendTarget ? (
               <>
                 <button onClick={() => setRecommendTarget(null)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', padding: 0, marginBottom: 12, cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif", fontSize: 13, fontWeight: 600, color: '#A39B90' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="M15 5l-7 7 7 7" /></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A39B90" strokeWidth="2.4" strokeLinecap="round"><path d="M9 5l7 7-7 7" /></svg>
                   חזרה
                 </button>
                 <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 6 }}>
@@ -507,7 +507,7 @@ export default function BookDetail({ book, currentUser, onClose, onBorrow, onEdi
                   <button key={f.id} onClick={() => setRecommendTarget(f)} style={{ width: '100%', border: '1.5px solid #ECE7DE', background: '#FFFFFF', borderRadius: 14, padding: '12px 14px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}>
                     <div style={{ width: 36, height: 36, borderRadius: '50%', background: avatarPalette(f.id).bg, color: avatarPalette(f.id).color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14, flex: 'none' }}>{initial(f.name)}</div>
                     <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622' }}>{f.name}</div>
-                    <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M9 18l6-6-6-6" /></svg>
+                    <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
                   </button>
                 ))}
               </>
@@ -540,7 +540,7 @@ function ContactBtn({ icon, label, sub, onClick, color }) {
         <div style={{ fontSize: 13, color: '#A39B90', marginTop: 1 }}>{sub}</div>
       </div>
       <svg style={{ marginLeft: 'auto' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#CFC8BB" strokeWidth="2.2" strokeLinecap="round">
-        <path d="M9 18l6-6-6-6" />
+        <path d="M15 18l-6-6 6-6" />
       </svg>
     </button>
   )
