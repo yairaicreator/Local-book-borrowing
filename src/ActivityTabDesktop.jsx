@@ -12,6 +12,8 @@ function timeAgo(ts) {
 
 export default function ActivityTabDesktop({ currentUser, onOpenBook }) {
   const [incoming, setIncoming] = useState([])
+  const [declined, setDeclined] = useState([])
+  const [incomingView, setIncomingView] = useState('pending') // 'pending' | 'declined'
   const [borrows, setBorrows] = useState([])
   const [allWaitlisted, setAllWaitlisted] = useState([])
   const [readingList, setReadingList] = useState([])
@@ -25,14 +27,16 @@ export default function ActivityTabDesktop({ currentUser, onOpenBook }) {
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
-    const [incomingRes, borrowsRes, waitlistRes, rlRes, recentRes] = await Promise.all([
+    const [incomingRes, declinedRes, borrowsRes, waitlistRes, rlRes, recentRes] = await Promise.all([
       supabase.from('borrows').select('*, Books!inner(id, title, author, add_by), Users!borrower_id(name)').eq('Books.add_by', currentUser.id).eq('status', 'requested').order('created_at', { ascending: false }),
+      supabase.from('borrows').select('*, Books!inner(id, title, author, add_by), Users!borrower_id(name)').eq('Books.add_by', currentUser.id).eq('status', 'declined').order('created_at', { ascending: false }),
       supabase.from('borrows').select('*, Books(*, Users(name))').eq('borrower_id', currentUser.id).order('created_at', { ascending: false }),
       supabase.from('borrows').select('id, book_id, created_at').eq('status', 'waitlisted').order('created_at'),
       supabase.from('reading_list').select('*, Books(*, Users(name))').eq('user_id', currentUser.id).order('created_at'),
       supabase.from('Notifications').select('id, message, created_at').eq('recipient_id', currentUser.id).order('created_at', { ascending: false }).limit(20),
     ])
     setIncoming(incomingRes.data || [])
+    setDeclined(declinedRes.data || [])
     setBorrows(borrowsRes.data || [])
     setAllWaitlisted(waitlistRes.data || [])
     setReadingList(rlRes.data || [])
@@ -68,9 +72,10 @@ export default function ActivityTabDesktop({ currentUser, onOpenBook }) {
 
   async function declineRequest(req) {
     setBusyIncoming(req.id)
-    await supabase.from('borrows').delete().eq('id', req.id)
+    await supabase.from('borrows').update({ status: 'declined' }).eq('id', req.id)
     await releaseOrPromote(req.book_id)
     setIncoming(prev => prev.filter(r => r.id !== req.id))
+    setDeclined(prev => [{ ...req, status: 'declined' }, ...prev])
     setBusyIncoming(null)
   }
 
@@ -120,7 +125,7 @@ export default function ActivityTabDesktop({ currentUser, onOpenBook }) {
     return siblings.findIndex(w => w.id === b.id) + 1
   }
 
-  const requestedBorrows = borrows.filter(b => b.status !== 'borrowed')
+  const requestedBorrows = borrows.filter(b => b.status === 'requested' || b.status === 'waitlisted')
   const activeBorrows = borrows.filter(b => b.status === 'borrowed')
   const readCount = readingList.filter(r => r.is_read).length
   const existingBookIds = readingList.filter(r => r.book_id).map(r => r.book_id)
@@ -131,22 +136,51 @@ export default function ActivityTabDesktop({ currentUser, onOpenBook }) {
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start' }}>
         <div>
-          <Section title="בקשות שקיבלת" count={incoming.length}>
-            {incoming.length === 0
-              ? <Empty>אין בקשות חדשות — כשמישהו יבקש לשאול ספר שלך, זה יופיע כאן.</Empty>
-              : incoming.map(req => (
-                  <Row key={req.id}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622', marginBottom: 1 }}>{req.Books?.title}</div>
-                      <div style={{ fontSize: 13, color: '#A39B90' }}><strong style={{ color: '#6B5440' }}>{req.Users?.name}</strong> ביקש/ה לשאול</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
-                      <button onClick={() => declineRequest(req)} disabled={busyIncoming === req.id} style={btnGhost('#B24A3A')}>דחה</button>
-                      <button onClick={() => handOverBook(req)} disabled={busyIncoming === req.id} style={btnSolid}>{busyIncoming === req.id ? '…' : 'אישור מסירה'}</button>
-                    </div>
-                  </Row>
-                ))
+          <Section title="בקשות שקיבלת" count={incomingView === 'pending' ? incoming.length : declined.length}
+            action={
+              <div style={{ display: 'flex', gap: 4, background: '#EFEAE1', borderRadius: 10, padding: 3 }}>
+                {[['pending', 'בקשות שקיבלתי'], ['declined', 'בקשות שדחיתי']].map(([key, label]) => {
+                  const on = incomingView === key
+                  return (
+                    <button key={key} onClick={() => setIncomingView(key)} style={{
+                      border: 'none', cursor: 'pointer', fontFamily: "'Source Sans 3',sans-serif",
+                      fontWeight: 600, fontSize: 12, padding: '6px 12px', borderRadius: 7,
+                      background: on ? '#FFFFFF' : 'transparent', color: on ? '#2C2622' : '#8A8278',
+                      boxShadow: on ? '0 1px 4px rgba(40,30,18,.12)' : 'none', whiteSpace: 'nowrap',
+                    }}>{label}</button>
+                  )
+                })}
+              </div>
             }
+          >
+            {incomingView === 'pending' ? (
+              incoming.length === 0
+                ? <Empty>אין בקשות חדשות — כשמישהו יבקש לשאול ספר שלך, זה יופיע כאן.</Empty>
+                : incoming.map(req => (
+                    <Row key={req.id}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622', marginBottom: 1 }}>{req.Books?.title}</div>
+                        <div style={{ fontSize: 13, color: '#A39B90' }}><strong style={{ color: '#6B5440' }}>{req.Users?.name}</strong> ביקש/ה לשאול</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
+                        <button onClick={() => declineRequest(req)} disabled={busyIncoming === req.id} style={btnGhost('#B24A3A')}>דחה</button>
+                        <button onClick={() => handOverBook(req)} disabled={busyIncoming === req.id} style={btnSolid}>{busyIncoming === req.id ? '…' : 'אישור מסירה'}</button>
+                      </div>
+                    </Row>
+                  ))
+            ) : (
+              declined.length === 0
+                ? <Empty>לא דחית אף בקשה עדיין.</Empty>
+                : declined.map(req => (
+                    <Row key={req.id}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 15, color: '#2C2622', marginBottom: 1 }}>{req.Books?.title}</div>
+                        <div style={{ fontSize: 13, color: '#A39B90' }}><strong style={{ color: '#6B5440' }}>{req.Users?.name}</strong> ביקש/ה לשאול</div>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#B24A3A', background: '#F4E2DD', padding: '4px 8px', borderRadius: 999, flex: 'none' }}>נדחה</span>
+                    </Row>
+                  ))
+            )}
           </Section>
 
           <Section title="מבוקשים" count={requestedBorrows.length}>
