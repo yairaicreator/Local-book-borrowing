@@ -5,7 +5,7 @@ import { analyzeBookCoverWithGemini, analyzeBackCoverWithGemini, searchBooks } f
 
 const isMobileDevice = () => window.innerWidth < 640
 
-export default function AddBook({ currentUser, onClose, onSaved, desktop = false, bookToEdit = null }) {
+export default function AddBook({ currentUser, onClose, onSaved, onDeleted, desktop = false, bookToEdit = null }) {
   const editing = !!bookToEdit
   const [title, setTitle] = useState(bookToEdit?.title || '')
   const [author, setAuthor] = useState(bookToEdit?.author || '')
@@ -28,6 +28,8 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showDupConfirm, setShowDupConfirm] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const dupConfirmedRef = useRef(false)
   const frontRef = useRef()
   const backRef = useRef()
@@ -165,6 +167,23 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
     }
   }
 
+  async function handleDelete() {
+    if (!editing || deleting) return
+    setDeleting(true)
+    try {
+      await supabase.from('Notifications').delete().eq('book_id', bookToEdit.id)
+      await supabase.from('borrows').delete().eq('book_id', bookToEdit.id)
+      await supabase.from('reading_list').delete().eq('book_id', bookToEdit.id)
+      const { error: delErr } = await supabase.from('Books').delete().eq('id', bookToEdit.id)
+      if (delErr) throw delErr
+      setShowDeleteConfirm(false)
+      onDeleted ? onDeleted() : onSaved()
+    } catch (e) {
+      setError(e.message || 'שגיאה במחיקת הספר.')
+      setDeleting(false)
+    }
+  }
+
   const canSave = title.trim() && author.trim() && !saving
 
   if (desktop) {
@@ -270,12 +289,18 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           </div>
 
           <div style={{ padding: '18px 30px 24px', borderTop: '1px solid #ECE7DE', display: 'flex', gap: 12 }}>
+            {editing && (
+              <button onClick={() => setShowDeleteConfirm(true)} style={deleteBtnStyle}>מחק ספר</button>
+            )}
             <button onClick={onClose} style={cancelBtnStyle}>ביטול</button>
             <button onClick={handleSave} disabled={!canSave} style={{ ...saveBtnStyle, background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
               {saving ? 'שומר…' : editing ? 'שמור שינויים' : 'שמור ספר'}
             </button>
           </div>
         </div>
+        {showDeleteConfirm && (
+          <DeleteConfirm title={title} deleting={deleting} onCancel={() => setShowDeleteConfirm(false)} onConfirm={handleDelete} />
+        )}
       </div>
     )
   }
@@ -372,11 +397,18 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
         {error && <div style={{ color: '#B24A3A', fontSize: 14, marginTop: 8 }}>{error}</div>}
       </div>
 
-      <div style={{ padding: '14px 22px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE' }}>
-        <button onClick={handleSave} disabled={!canSave} style={{ width: '100%', border: 'none', borderRadius: 16, padding: 17, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 17, color: '#F7F5F1', background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
+      <div style={{ padding: '14px 22px 30px', background: '#F7F5F1', borderTop: '1px solid #ECE7DE', display: 'flex', gap: 10 }}>
+        {editing && (
+          <button onClick={() => setShowDeleteConfirm(true)} style={{ ...deleteBtnStyle, flex: 'none' }}>מחק</button>
+        )}
+        <button onClick={handleSave} disabled={!canSave} style={{ flex: 1, border: 'none', borderRadius: 16, padding: 17, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 17, color: '#F7F5F1', background: canSave ? '#C05A3E' : '#E3B5A8', cursor: canSave ? 'pointer' : 'not-allowed' }}>
           {saving ? 'שומר…' : editing ? 'שמור שינויים' : 'שמור ספר'}
         </button>
       </div>
+
+      {showDeleteConfirm && (
+        <DeleteConfirm title={title} deleting={deleting} onCancel={() => setShowDeleteConfirm(false)} onConfirm={handleDelete} />
+      )}
 
       {showDupConfirm && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(40,30,18,.55)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
@@ -394,6 +426,25 @@ export default function AddBook({ currentUser, onClose, onSaved, desktop = false
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function DeleteConfirm({ title, deleting, onCancel, onConfirm }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(40,30,18,.55)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+      <div style={{ background: '#F7F5F1', borderRadius: 22, padding: '28px 24px', width: '100%', maxWidth: 360, boxShadow: '0 24px 56px -18px rgba(40,30,18,.55)', animation: 'flPop .26s cubic-bezier(.22,1,.36,1)' }}>
+        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 20, color: '#2C2622', marginBottom: 10 }}>למחוק את הספר?</div>
+        <div style={{ fontSize: 15, color: '#4A443D', lineHeight: 1.55, marginBottom: 22 }}>
+          <strong>"{title}"</strong> יימחק לצמיתות מהמדף שלך, כולל היסטוריית ההשאלות שלו. לא ניתן לבטל פעולה זו.
+        </div>
+        <button onClick={onConfirm} disabled={deleting} style={{ width: '100%', border: 'none', borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1', background: '#B24A3A', cursor: deleting ? 'not-allowed' : 'pointer', marginBottom: 10 }}>
+          {deleting ? 'מוחק…' : 'כן, מחק את הספר'}
+        </button>
+        <button onClick={onCancel} disabled={deleting} style={{ width: '100%', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: 14, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#6E675C', cursor: 'pointer' }}>
+          ביטול
+        </button>
+      </div>
     </div>
   )
 }
@@ -511,6 +562,7 @@ function DLabel({ children, style }) { return <div style={{ fontSize: 13, fontWe
 const inputStyle = { width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 13, padding: '14px 15px', fontFamily: "'Source Sans 3',sans-serif", fontSize: 16, color: '#2C2622', outline: 'none', marginBottom: 18, display: 'block' }
 const dinputStyle = { width: '100%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', borderRadius: 12, padding: '13px 15px', fontFamily: "'Source Sans 3',sans-serif", fontSize: 15, color: '#2C2622', outline: 'none', marginBottom: 16, display: 'block' }
 const cancelBtnStyle = { flex: 'none', border: '1.5px solid #E7E1D6', background: 'transparent', borderRadius: 14, padding: '15px 24px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#6E675C', cursor: 'pointer' }
+const deleteBtnStyle = { flex: 'none', border: '1.5px solid #E7B5A8', background: 'transparent', borderRadius: 14, padding: '15px 20px', fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 15, color: '#B24A3A', cursor: 'pointer' }
 const saveBtnStyle = { flex: 1, border: 'none', borderRadius: 14, padding: 15, fontFamily: "'Source Sans 3',sans-serif", fontWeight: 600, fontSize: 16, color: '#F7F5F1' }
 const photoLabel = { fontSize: 11, fontWeight: 600, color: '#A39B90', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }
 const photoSub = { fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: '#B4ABA0' }

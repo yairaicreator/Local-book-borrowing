@@ -52,18 +52,25 @@ export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpe
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '54px 22px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-          <button onClick={onOpenProfile} style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 15, color: '#7A4A28', flex: 'none', border: 'none', cursor: 'pointer' }}>
-            {initial(currentUser.name)}
-          </button>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#B5502E', letterSpacing: '-.01em', lineHeight: 1.15 }}>שלום, {firstName}</div>
+      <div style={{ padding: '34px 22px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <button onClick={onOpenProfile} style={{ width: 38, height: 38, borderRadius: '50%', background: '#E7C8A0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 15, color: '#7A4A28', flex: 'none', border: 'none', cursor: 'pointer' }}>
+              {initial(currentUser.name)}
+            </button>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 22, color: '#B5502E', letterSpacing: '-.01em', lineHeight: 1.15 }}>שלום, {firstName}</div>
+            </div>
           </div>
-          <button onClick={onShare} title="שתף קישור לאפליקציה" style={{ width: 38, height: 38, borderRadius: '50%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
-          </button>
-          <NotificationBell currentUser={currentUser} small onGoToActivity={onGoToActivity} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+            <button onClick={onShare} title="שתף קישור לאפליקציה" style={{ width: 38, height: 38, borderRadius: '50%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
+            </button>
+            <NotificationBell currentUser={currentUser} small onGoToActivity={onGoToActivity} />
+            <button onClick={onOpenAdd} title="הוסף ספר" style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            </button>
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFFFFF', border: '1.5px solid #E7E1D6', borderRadius: 14, padding: '12px 14px', marginBottom: 14 }}>

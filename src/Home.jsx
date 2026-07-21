@@ -115,7 +115,9 @@ export default function Home({ currentUser: initialUser, onUserUpdate }) {
         <AddBook currentUser={currentUser} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); showToast('הספר נוסף למדף'); fetchBooks() }} />
       )}
       {editBook && (
-        <AddBook currentUser={currentUser} bookToEdit={editBook} onClose={() => setEditBook(null)} onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }} />
+        <AddBook currentUser={currentUser} bookToEdit={editBook} onClose={() => setEditBook(null)}
+          onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }}
+          onDeleted={() => { setEditBook(null); showToast('הספר נמחק'); fetchBooks() }} />
       )}
       {showProfile && (
         <Profile currentUser={currentUser} onClose={() => setShowProfile(false)}

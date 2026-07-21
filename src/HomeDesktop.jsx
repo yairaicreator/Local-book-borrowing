@@ -534,7 +534,9 @@ export default function HomeDesktop({ currentUser: initialUser, onUserUpdate }) 
 
       {/* ── Edit Book Modal ── */}
       {editBook && (
-        <AddBook currentUser={currentUser} desktop bookToEdit={editBook} onClose={() => setEditBook(null)} onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }} />
+        <AddBook currentUser={currentUser} desktop bookToEdit={editBook} onClose={() => setEditBook(null)}
+          onSaved={() => { setEditBook(null); showToast('הספר עודכן בהצלחה'); fetchBooks() }}
+          onDeleted={() => { setEditBook(null); showToast('הספר נמחק'); fetchBooks() }} />
       )}
 
       {/* ── Profile overlay ── */}
