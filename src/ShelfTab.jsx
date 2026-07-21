@@ -36,8 +36,13 @@ export default function ShelfTab({ currentUser, books, loading, onOpenBook, onOp
 
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '54px 22px 16px' }}>
-        <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622' }}>המדף שלי</div>
+      <div style={{ padding: '34px 22px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ fontFamily: "'Lora',serif", fontWeight: 600, fontSize: 26, color: '#2C2622' }}>המדף שלי</div>
+          <button onClick={onOpenAdd} title="הוסף ספר" style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          </button>
+        </div>
         <div style={{ fontSize: 14, color: '#8A8278', marginTop: 3 }}>{myBooks.length} ספרים משותפים עם המעגל שלך</div>
       </div>
 
@@ -99,10 +104,6 @@ export default function ShelfTab({ currentUser, books, loading, onOpenBook, onOp
           </div>
         )}
       </div>
-
-      <button onClick={onOpenAdd} style={{ position: 'absolute', right: 20, bottom: 96, width: 58, height: 58, border: 'none', borderRadius: 19, background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 26px -8px rgba(180,90,60,.7)' }}>
-        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
     </div>
   )
 }

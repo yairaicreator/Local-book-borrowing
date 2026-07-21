@@ -66,7 +66,7 @@ export default function HomeTab({ books, loading, currentUser, onOpenBook, onOpe
             <button onClick={onShare} title="שתף קישור לאפליקציה" style={{ width: 38, height: 38, borderRadius: '50%', border: '1.5px solid #E7E1D6', background: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6E675C" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
             </button>
-            <NotificationBell currentUser={currentUser} small onGoToActivity={onGoToActivity} />
+            <NotificationBell currentUser={currentUser} small onGoToActivity={onGoToActivity} anchor="left" />
             <button onClick={onOpenAdd} title="הוסף ספר" style={{ width: 38, height: 38, borderRadius: '50%', border: 'none', background: '#C05A3E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5F1" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
             </button>

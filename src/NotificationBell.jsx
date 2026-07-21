@@ -11,7 +11,7 @@ function timeAgo(ts) {
 
 const BORROW_REQUEST_RE = /ביקש.*לשאול/
 
-export default function NotificationBell({ currentUser, small = false, onGoToActivity }) {
+export default function NotificationBell({ currentUser, small = false, onGoToActivity, anchor = 'right' }) {
   const [notifs, setNotifs] = useState([])
   const [open, setOpen] = useState(false)
   const panelRef = useRef()
@@ -76,8 +76,8 @@ export default function NotificationBell({ currentUser, small = false, onGoToAct
 
       {open && (
         <div style={{
-          position: 'absolute', top: small ? 40 : 46, right: 0,
-          width: 320, maxHeight: 420, background: '#F7F5F1',
+          position: 'absolute', top: small ? 40 : 46, [anchor]: 0,
+          width: 290, maxWidth: 'calc(100vw - 90px)', maxHeight: 420, background: '#F7F5F1',
           borderRadius: 18, boxShadow: '0 16px 48px -12px rgba(40,30,18,.45)',
           border: '1px solid #ECE7DE', zIndex: 100,
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
